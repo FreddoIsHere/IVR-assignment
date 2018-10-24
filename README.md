@@ -10,7 +10,7 @@ If have already an installed simulator through the lab sessions, you only need t
 
 1. Clone the assignment repo: `git clone https://github.com/ccimrie/IVR-assignmnet`
 2. Change the name of your main.py within your IVR-Labs folder: `mv /path/to/folder/IVR-Labs/main.py /path/to/folder/IVR-Labs/main-labs.py`
-3. Copy across the assignment files: `cp -r /path/to/assignment/IVR-assignment/reacher3D /path/to/folder/IVR-Labs && /path/to/assignment/IVR-assignment/main.py /path/to/folder/IVR-Labs`
+3. Copy across the assignment files: `cp -r /path/to/assignment/IVR-assignment/reacher3D /path/to/folder/IVR-Labs && cp /path/to/assignment/IVR-assignment/main.py /path/to/folder/IVR-Labs`
 4. Run the command: `WS=$PWD`
 5. Clone the pyquaternion repo: `git clone https://github.com/KieranWynn/pyquaternion.git`
 6. Go into this folder: `cd pyquaternion`
