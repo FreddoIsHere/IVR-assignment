@@ -4,6 +4,21 @@
 - [How to run](#how-to-run)
 
 ## Installation guide
+
+### Already have an installed simulator
+If have already an installed simulator through the lab sessions, you only need to move some files across and install one additional package. To do this follow these steps:
+
+1. Clone the assignment repo: `git clone https://github.com/ccimrie/IVR-assignmnet`
+2. Change the name of your main.py within your IVR-Labs folder: `mv /path/to/folder/IVR-Labs/main.py /path/to/folder/IVR-Labs/main-labs.py`
+3. Copy across the assignment files: `cp -r /path/to/assignment/IVR-assignment/reacher3D /path/to/folder/IVR-Labs && /path/to/assignment/IVR-assignment/main.py /path/to/folder/IVR-Labs`
+4. Run the command: `WS=$PWD`
+5. Clone the pyquaternion repo: `git clone https://github.com/KieranWynn/pyquaternion.git`
+6. Go into this folder: `cd pyquaternion`
+7. Install: `pip install . -I --prefix $WS/VRInstall`
+8. Go to where main.py is: `cd $WS`
+
+You should now have the assignmnet setup ready alongside your lab setup. You will still need to follow the same procedure on how to run as you did for the labs.
+
 ### Virtual Machine Installation 
 If you are using Windows you can install a Virtual Machine (VM) that can run Ubuntu and from here you will be able to install easier the openai gym framework. The steps briefly are:
 
@@ -19,7 +34,7 @@ If you are using Windows you can install a Virtual Machine (VM) that can run Ubu
 
 5. One of the steps will be how much RAM and virtual hard disk space to assign. For now 1GB for RAM and 10GB for the hard disk should suffice (change as you feel is appropriate)
 
-5. Here you will then install Ubuntu onto your VM. (When asked what to do with regards to the hard disk click use all, do not worry this is talking about the virtual hard disk). <https://tutorials.ubuntu.com/tutorial/tutorial-install-ubuntu-desktop-1604#0>
+6. Here you will then install Ubuntu onto your VM. (When asked what to do with regards to the hard disk click use all, do not worry this is talking about the virtual hard disk). <https://tutorials.ubuntu.com/tutorial/tutorial-install-ubuntu-desktop-1604#0>
 
 This is a brief set of steps and I recommend also looking at this link as it is a good reference: <https://medium.com/@tushar0618/install-ubuntu-16-04-lts-on-virtual-box-desktop-version-30dc6f1958d0>
 
