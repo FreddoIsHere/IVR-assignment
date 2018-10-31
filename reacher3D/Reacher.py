@@ -355,6 +355,7 @@ class ReacherEnv(gym.Env):
         self.ground_truth_joint_angles = np.array([self.j1.getAngle(), self.j2.getAngle(),self.j3.getAngle(),self.j5.getAngle()])
         self.ground_truth_joint_velocities = np.array([self.j1.getAngleRate(), self.j2.getAngleRate(),self.j3.getAngleRate(),self.j5.getAngleRate()])
         self.ground_truth_valid_target = self.targetPos.T.flatten()
+        self.ground_truth_invalid_target = self.invalpos.T.flatten()
         self.ground_truth_end_effector = self.body4.getPosition()
 
         if self.viewer.time==0:
@@ -365,12 +366,11 @@ class ReacherEnv(gym.Env):
             self.viewer.time=np.random.randint(20)+1
         else:
             self.viewer.time-=1
-            self.viewer.lightValue*=self.dir
-            if self.viewer.lightValue>1:
-                self.viewer.lightValue=1
-            elif self.viewer.lightValue<0.01:
-                self.viewer.lightValue=0.01
         self.viewer.lightValue*=self.dir
+        if self.viewer.lightValue>1:
+            self.viewer.lightValue=1
+        elif self.viewer.lightValue<0.01:
+            self.viewer.lightValue=0.01
         for obj in self.viewer.onetime_geoms:
             redBright, greenBright, blueBright=self.update_colour(obj._color.vec4)
             obj.set_color(redBright, greenBright, blueBright)
