@@ -93,8 +93,8 @@ class Viewer(object):
 
         bright=1.0*self.lightValue
 
-        glClearColor(bright, bright, bright,1)
         self.window_xy.switch_to()
+        glClearColor(bright, bright, bright,1)
         self.window_xy.clear()
 
         self.window_xy.dispatch_events() 
@@ -142,8 +142,9 @@ class Viewer(object):
 
         self.window_xy.flip()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glClearColor(bright, bright, bright,1)
+
         self.window_xz.switch_to()
+        glClearColor(bright, bright, bright,1)
         self.window_xz.clear()
 
         self.window_xz.dispatch_events()
