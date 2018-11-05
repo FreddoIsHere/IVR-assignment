@@ -64,7 +64,7 @@ class MainReacher():
 
         return self.coordinate_convert(np.array([cx,cy]))
     
-    def detect_target2(self, image, lumi):
+    def detect_target(self, image, lumi):
         a = 140 *lumi
         b = 190 *lumi
         mask = cv2.inRange(image, (a,a,a),(b,b,b))
@@ -77,21 +77,16 @@ class MainReacher():
         areadiff2 = cv2.contourArea(contours[1]) - cv2.contourArea(dc2)
         
         if areadiff2 < areadiff1:
-            cv2.drawContours(image, contours, 1, (0,255,0), 3)
             M = cv2.moments(contours[1])
         else:
-            cv2.drawContours(image, contours, 0, (0,255,0), 3)
             M = cv2.moments(contours[0])
+            
         cx = int(M['m10']/M['m00'])
         cy = int(M['m01']/M['m00'])
-        print(str(self.coordinate_convert([cx, cy])))
-        print(str(self.env.ground_truth_valid_target))
             
+        return self.coordinate_convert([cx, cy])
         
-        #mask = 255 - cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
-        return image
-        
-    def detect_target(self, image, lumi):
+    def detect_target2(self, image, lumi):
         a = 140 *lumi
         b = 190 *lumi
         mask = cv2.inRange(image, (a,a,a),(b,b,b))
@@ -148,6 +143,15 @@ class MainReacher():
     def coordinate_convert(self,pixels):
         #Converts pixels into metres
         return np.array([(pixels[0]-self.env.viewerSize/2)/self.env.resolution,-(pixels[1]-self.env.viewerSize/2)/self.env.resolution])
+    
+    def get_target_coords(self, xyarray, xzarray):
+        lumi1 = self.get_illumination(xyarray)
+        lumi2 = self.get_illumination(xzarray)
+        xy = self.detect_target(xyarray, lumi1)
+        xz = self.detect_target(xzarray, lumi2)
+        avgx = (xy[0] + xz[0])/2
+        
+        return [avgx, xy[1], xz[1]]
 
     def go(self):
         #The robot has several simulated modes:
@@ -162,6 +166,7 @@ class MainReacher():
         #Run 100000 iterations
         prev_JAs = np.zeros(3)
         prev_jvs = collections.deque(np.zeros(3),1)
+    
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
@@ -173,10 +178,13 @@ class MainReacher():
             arrxy,arrxz = self.env.render('rgb-array')
             
             if i == 100:
+                print(str(self.get_target_coords(arrxy, arrxz)))
+                print(str(self.env.ground_truth_valid_target))
                 #print(self.get_illumination(arrxy))
                 #]self.detect_target2(arrxy, self.get_illumination(arrxy))
-                cv2.imshow( "Display window", self.detect_target2(arrxy, self.get_illumination(arrxy)))
-                cv2.waitKey(0)
+                #xy = self.detect_target(arrxy, self.get_illumination(arrxy))
+                #cv2.imshow( "Display window", self.detect_target2(arrxy, self.get_illumination(arrxy)))
+                #cv2.waitKey(0)
 
             desired_joint_angles = np.array([0.5, 0.5, 0.3, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
