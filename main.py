@@ -25,10 +25,10 @@ class MainReacher():
         #POS-IMG : Same control as POS, however you must provide the current joint angles and velocities : env.step((estimated joint angles, estimated joint velocities, desired joint angles, np.zeros(3)))
         #VEL : A joint space velocity control, the inputs require the joint angle error and joint velocities : env.step((joint angle error (velocity), estimated joint velocities, np.zeros(3), np.zeros(3)))
         #TORQUE : Provides direct access to the torque control on the robot : env.step((np.zeros(3),np.zeros(3),np.zeros(3),desired joint torques))
-        self.env.controlMode="TORQUE"
+        self.env.controlMode="POS"
         #Run 100000 iterations
-        prev_JAs = np.zeros(3)
-        prev_jvs = collections.deque(np.zeros(3),1)
+        prev_JAs = np.zeros(4)
+        prev_jvs = collections.deque(np.zeros(4),1)
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
@@ -39,9 +39,11 @@ class MainReacher():
             #self.env.render returns 2 RGB arrays of the robot, one for the xy-plane, and one for the xz-plane
             arrxy,arrxz = self.env.render('rgb-array')
 
-            jointAngles = np.array([0.5,-0.5,0.5,-0.5])
-            # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
-            self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
+            jointAngles = np.array([0.5,0.5,0.5,-0.5])
+
+            self.env.step((np.zeros(4),np.zeros(4),np.zeros(4), np.zeros(4)))
+
+            self.env.step((np.zeros(4),np.zeros(4),jointAngles, np.zeros(4)))
             #The step method will send the control input to the robot, the parameters are as follows: (Current Joint Angles/Error, Current Joint Velocities, Desired Joint Angles, Torque input) 
 
 #main method
