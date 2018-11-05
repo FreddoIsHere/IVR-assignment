@@ -41,7 +41,7 @@ class MainReacher():
         return self.coordinate_convert(np.array([cx,cy]))
     
     def detect_blue(self, image, lumi):
-        mask = cv2.inRange(image, (0,0,245*lumi),(0,0,255))
+        mask = cv2.inRange(image, (0,0,200*lumi),(0,0,255))
         kernel = np.ones((5,5),np.uint8)
         mask = cv2.dilate(mask,kernel,iterations=2)
         mask=cv2.erode(mask,kernel,iterations=3)
@@ -152,6 +152,36 @@ class MainReacher():
         avgx = (xy[0] + xz[0])/2
         
         return [avgx, xy[1], xz[1]]
+    
+    def detect_joint_angles(self, xyarray, xzarray):
+        lumi1 = self.get_illumination(xyarray)
+        lumi2 = self.get_illumination(xzarray)
+        
+        redxz = self.detect_red(xzarray)
+        redxy = self.detect_red(xyarray)
+        ja1 = math.atan2(redxz[1],redxz[0])
+        
+        greenxy = self.detect_green(xyarray)
+        ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
+        ja2 = self.angle_normalize(ja2)
+        
+        bluexy = self.detect_blue(xyarray, lumi1)
+        ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
+        ja3 = self.angle_normalize(ja3)
+        
+        endxz = self.detect_end(xzarray, lumi2)
+        
+        ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
+        ja4 = self.angle_normalize(ja4)
+        
+        print(str([ja1, ja2, ja3, ja4]))
+        
+        return [ja1, ja2, ja3, ja4]
+    
+    def angle_normalize(self,x):
+        #Normalizes the angle between pi and -pi
+        return (((x+np.pi) % (2*np.pi)) - np.pi)
+        
 
     def go(self):
         #The robot has several simulated modes:
@@ -185,6 +215,10 @@ class MainReacher():
                 #xy = self.detect_target(arrxy, self.get_illumination(arrxy))
                 #cv2.imshow( "Display window", self.detect_target2(arrxy, self.get_illumination(arrxy)))
                 #cv2.waitKey(0)
+                
+            if i == 400:
+                angles = self.detect_joint_angles(arrxy, arrxz)
+                print(self.env.ground_truth_joint_angles)
 
             desired_joint_angles = np.array([0.5, 0.5, 0.3, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
