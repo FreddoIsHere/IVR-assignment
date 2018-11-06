@@ -173,20 +173,26 @@ class MainReacher():
         lumi1 = self.get_illumination(xyarray)
         lumi2 = self.get_illumination(xzarray)
 
+
         redxz = self.detect_red(xzarray)
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
+            if abs(ja1-self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt))>math.pi/2:
+                print("Estimated ja1 as sudden change")
+                ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
         else:
             print("Estimated ja1")
             ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
-
-        centreOfArm = (0.5,0)
-
         greenxy = self.detect_green(xyarray)
-        if type(greenxy) == np.ndarray:
-            ja2 = math.atan2(greenxy[1]-centreOfArm[1],greenxy[0]-centreOfArm[0])
+        redxy = self.detect_red(xyarray)
+        print("Predicted centre of green: %s" % greenxy)
+        if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
+            ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
+            if abs(ja2-self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt))>math.pi/2:
+                print("Estimated ja2 as sudden change")
+                ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
         else:
             print("Estimated ja2")
             ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
@@ -195,6 +201,9 @@ class MainReacher():
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
             ja3 = self.angle_normalize(ja3)
+            if abs(ja3-self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt))>math.pi/2:
+                print("Estimated ja3 as sudden change")
+                ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
         else:
             print("Estimated ja3")
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
@@ -203,11 +212,15 @@ class MainReacher():
         if type(endxz) == np.ndarray and type(redxz) == np.ndarray:
             ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
             ja4 = self.angle_normalize(ja4)
+            if abs(ja4-self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt))>math.pi/2:
+                print("Estimated ja4 as sudden change")
+                ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
         else:
             print("Estimated ja4")
             ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
 
         #print(str([ja1, ja2, ja3, ja4]))
+        self.prevPos=[redxz,greenxy,bluexy,endxz]
 
         return np.array([ja1, ja2, ja3, ja4])
 
@@ -277,13 +290,14 @@ class MainReacher():
             print("Actual angles: %s" % self.env.ground_truth_joint_angles)
             print("Predicted angles %s" % detectedJointAngles)
             print("Predicted previous angles %s" % prev_JAs)
+            print("Normalized difference of angles %s" % self.angle_normalize(detectedJointAngles-prev_JAs))
             print("Difference from actual velocity: %s" % (detectedJointVels-self.env.ground_truth_joint_velocities))
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
-            desired_joint_angles = np.array([0.5, 0, 0, 0])
+            desired_joint_angles = np.array([0, math.pi/2, 0, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
