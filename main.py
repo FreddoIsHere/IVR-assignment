@@ -41,9 +41,8 @@ class MainReacher():
 
             jointAngles = np.array([0.5,0.5,0.5,-0.5])
 
-            self.env.step((np.zeros(4),np.zeros(4),np.zeros(4), np.zeros(4)))
-
             self.env.step((np.zeros(4),np.zeros(4),jointAngles, np.zeros(4)))
+            #self.env.step((np.zeros(4),np.zeros(4),np.zeros(4), np.zeros(4)))
             #The step method will send the control input to the robot, the parameters are as follows: (Current Joint Angles/Error, Current Joint Velocities, Desired Joint Angles, Torque input) 
 
 #main method
