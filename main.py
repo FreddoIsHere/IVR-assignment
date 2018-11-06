@@ -186,10 +186,10 @@ class MainReacher():
 
         greenxy = self.detect_green(xyarray)
         redxy = self.detect_red(xyarray)
-        print("Predicted centre of green: %s" % greenxy)
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
+            # Under normal operation this works as intended, but when the robots are starts to spin eratically this can excastipate the spin
             if abs(ja2-self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt))>math.pi/2:
                 print("Estimated ja2 as sudden change")
                 ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
@@ -209,8 +209,9 @@ class MainReacher():
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
 
         endxz = self.detect_end(xzarray, lumi2)
-        if type(endxz) == np.ndarray and type(redxz) == np.ndarray:
-            ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
+        bluexz = self.detect_blue(xzarray, lumi2)
+        if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
+            ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])-ja1
             ja4 = self.angle_normalize(ja4)
             if abs(ja4-self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt))>math.pi/2:
                 print("Estimated ja4 as sudden change")
@@ -220,7 +221,6 @@ class MainReacher():
             ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
 
         #print(str([ja1, ja2, ja3, ja4]))
-        self.prevPos=[redxz,greenxy,bluexy,endxz]
 
         return np.array([ja1, ja2, ja3, ja4])
 
@@ -247,7 +247,7 @@ class MainReacher():
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
 
-        start = False
+        self.start = False
 
         for i in range(100000):
             #The change in time between iterations can be found in the self.env.dt variable
@@ -286,18 +286,20 @@ class MainReacher():
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
-            print("Actual position of end effector: %s" % str([self.env.ground_truth_end_effector[0],self.env.ground_truth_end_effector[2]]))
             print("Actual angles: %s" % self.env.ground_truth_joint_angles)
             print("Predicted angles %s" % detectedJointAngles)
-            print("Predicted previous angles %s" % prev_JAs)
-            print("Normalized difference of angles %s" % self.angle_normalize(detectedJointAngles-prev_JAs))
-            print("Difference from actual velocity: %s" % (detectedJointVels-self.env.ground_truth_joint_velocities))
+            print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
+            print("Predicted velocity: %s" % detectedJointVels)
+            print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
-            desired_joint_angles = np.array([0, math.pi/2, 0, 0])
+            if i>0:
+                #time.sleep(1)
+                self.start = True
+            desired_joint_angles = np.array([math.pi/2, 0, 0, math.pi/2])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
