@@ -178,7 +178,7 @@ class MainReacher():
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
             if abs(ja1-self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt))>math.pi/2:
-                print("Estimated ja1 as sudden change")
+                print("Estimated ja1 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt),ja1))
                 ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
         else:
             print("Estimated ja1")
@@ -189,9 +189,8 @@ class MainReacher():
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
-            # Under normal operation this works as intended, but when the robots are starts to spin eratically this can excastipate the spin
             if abs(ja2-self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt))>math.pi/2:
-                print("Estimated ja2 as sudden change")
+                print("Estimated ja2 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt),ja2))
                 ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
         else:
             print("Estimated ja2")
@@ -202,7 +201,7 @@ class MainReacher():
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
             ja3 = self.angle_normalize(ja3)
             if abs(ja3-self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt))>math.pi/2:
-                print("Estimated ja3 as sudden change")
+                print("Estimated ja3 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt),ja3))
                 ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
         else:
             print("Estimated ja3")
@@ -214,7 +213,7 @@ class MainReacher():
             ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])-ja1
             ja4 = self.angle_normalize(ja4)
             if abs(ja4-self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt))>math.pi/2:
-                print("Estimated ja4 as sudden change")
+                print("Estimated ja4 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt),ja4))
                 ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
         else:
             print("Estimated ja4")
@@ -296,10 +295,11 @@ class MainReacher():
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
-            if i>0:
+            if i>140:
+                print(i)
                 #time.sleep(1)
                 self.start = True
-            desired_joint_angles = np.array([math.pi/2, 0, 0, math.pi/2])
+            desired_joint_angles = np.array([math.pi, 0, 0, -math.pi/2])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
