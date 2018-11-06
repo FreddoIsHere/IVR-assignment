@@ -158,11 +158,12 @@ class MainReacher():
         lumi2 = self.get_illumination(xzarray)
 
         redxz = self.detect_red(xzarray)
-        redxy = self.detect_red(xyarray)
         ja1 = math.atan2(redxz[1],redxz[0])
 
+        centreOfArm = (0.5,0)
+
         greenxy = self.detect_green(xyarray)
-        ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
+        ja2 = math.atan2(greenxy[1]-centreOfArm[1],greenxy[0]-centreOfArm[0])
         ja2 = self.angle_normalize(ja2)
 
         bluexy = self.detect_blue(xyarray, lumi1)
@@ -174,7 +175,7 @@ class MainReacher():
         ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
         ja4 = self.angle_normalize(ja4)
 
-        print(str([ja1, ja2, ja3, ja4]))
+        #print(str([ja1, ja2, ja3, ja4]))
 
         return np.array([ja1, ja2, ja3, ja4])
 
@@ -196,12 +197,12 @@ class MainReacher():
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
         prev_jvs = collections.deque(np.zeros(4),1)
-        detectedJointAngles = np.zeros(4)
-        detectedJointVels = np.zeros(4)
 
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
+
+        start = False
 
         for i in range(100000):
             #The change in time between iterations can be found in the self.env.dt variable
@@ -222,22 +223,35 @@ class MainReacher():
                 #angles = self.detect_joint_angles(arrxy, arrxz)
                 #print(self.env.ground_truth_joint_angles)
 
-            if i == 0:
-                detectedJointAngles = self.env.ground_truth_joint_angles
+            #if i == 0:
+                #detectedJointAngles = self.env.ground_truth_joint_angles
 
-            if i > 1:
+            #if i > 1:
 
-                detectedJointAngles = self.detect_joint_angles(arrxy, arrxz)
+                #detectedJointAngles = self.detect_joint_angles(arrxy, arrxz)
 
                 #print("Actual target:"+str(self.env.ground_truth_valid_target))
                 #print("Predicted target:"+str(self.get_target_coords(arrxy, arrxz)))
 
-                print("Actual angles: %s" % self.env.ground_truth_joint_angles)
-                print("Predicted angles %s" % detectedJointAngles)
 
-            detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
+            if i == 0:
+                detectedJointAngles = np.zeros(4)
+                detectedJointVels = np.zeros(4)
+            else:
+                detectedJointAngles = self.detect_joint_angles(arrxy, arrxz)
+                detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
-            desired_joint_angles = np.array([0.5, 0.5, 0.3, 0])
+            print("Actual position of end effector: %s" % str([self.env.ground_truth_end_effector[0],self.env.ground_truth_end_effector[2]]))
+            print("Actual angles: %s" % self.env.ground_truth_joint_angles)
+            print("Predicted angles %s" % detectedJointAngles)
+            print("Predicted previous angles %s" % prev_JAs)
+            print("Difference from actual velocity: %s" % (detectedJointVels-self.env.ground_truth_joint_velocities))
+            print("------------------------------")
+            #if (detectedJointAngles[1]<-0.719 or start):
+            #    cv2.imshow('Nothing',np.zeros(5))
+            #    cv2.waitKey(0)
+            #    start = True
+            desired_joint_angles = np.array([0, -1, 0, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
