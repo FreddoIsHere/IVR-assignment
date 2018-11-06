@@ -28,7 +28,7 @@ class MainReacher():
             cy = int(M['m01']/M['m00'])
         except ZeroDivisionError:
             print("Got zero division error for red")
-            return self.prevPos[0]
+            return None
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -44,7 +44,7 @@ class MainReacher():
             cy = int(M['m01']/M['m00'])
         except ZeroDivisionError:
             print("Got zero division error for green")
-            return self.prevPos[1]
+            return None
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -60,7 +60,7 @@ class MainReacher():
             cy = int(M['m01']/M['m00'])
         except ZeroDivisionError:
             print("Got zero division error for blue")
-            return self.prevPos[2]
+            return None
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -76,7 +76,7 @@ class MainReacher():
             cy = int(M['m01']/M['m00'])
         except ZeroDivisionError:
             print("Got zero division error for end")
-            return self.prevPos[3]
+            return None
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -169,31 +169,45 @@ class MainReacher():
 
         return [avgx, xy[1], xz[1]]
 
-    def detect_joint_angles(self, xyarray, xzarray):
+    def detect_joint_angles(self, xyarray, xzarray, prev_JAs, prev_jvs):
         lumi1 = self.get_illumination(xyarray)
         lumi2 = self.get_illumination(xzarray)
 
         redxz = self.detect_red(xzarray)
-        ja1 = math.atan2(redxz[1],redxz[0])
+        if type(redxz) == np.ndarray:
+            ja1 = math.atan2(redxz[1],redxz[0])
+        else:
+            print("Estimated ja1")
+            ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
 
         centreOfArm = (0.5,0)
 
         greenxy = self.detect_green(xyarray)
-        ja2 = math.atan2(greenxy[1]-centreOfArm[1],greenxy[0]-centreOfArm[0])
-        ja2 = self.angle_normalize(ja2)
+        if type(greenxy) == np.ndarray:
+            ja2 = math.atan2(greenxy[1]-centreOfArm[1],greenxy[0]-centreOfArm[0])
+            ja2 = self.angle_normalize(ja2)
+        else:
+            print("Estimated ja2")
+            ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
 
         bluexy = self.detect_blue(xyarray, lumi1)
-        ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
-        ja3 = self.angle_normalize(ja3)
+        if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
+            ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
+            ja3 = self.angle_normalize(ja3)
+        else:
+            print("Estimated ja3")
+            ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
 
         endxz = self.detect_end(xzarray, lumi2)
-
-        ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
-        ja4 = self.angle_normalize(ja4)
+        if type(endxz) == np.ndarray and type(redxz) == np.ndarray:
+            ja4 = math.atan2(endxz[1]-redxz[1],endxz[0]-redxz[0])-ja1
+            ja4 = self.angle_normalize(ja4)
+        else:
+            print("Estimated ja4")
+            ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
 
         #print(str([ja1, ja2, ja3, ja4]))
-        self.prevPos = [redxz,greenxy,bluexy,endxz]
 
         return np.array([ja1, ja2, ja3, ja4])
 
@@ -214,7 +228,7 @@ class MainReacher():
         self.env.controlMode="POS-IMG"
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
-        prev_jvs = collections.deque(np.zeros(4),1)
+        prev_jvs = np.zeros(4)
 
 
         # Uncomment to have gravity act in the z-axis
@@ -256,7 +270,7 @@ class MainReacher():
                 detectedJointAngles = np.zeros(4)
                 detectedJointVels = np.zeros(4)
             else:
-                detectedJointAngles = self.detect_joint_angles(arrxy, arrxz)
+                detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
             print("Actual position of end effector: %s" % str([self.env.ground_truth_end_effector[0],self.env.ground_truth_end_effector[2]]))
@@ -269,7 +283,7 @@ class MainReacher():
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
-            desired_joint_angles = np.array([0, -1, 0, 0])
+            desired_joint_angles = np.array([0.5, 0, 0, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
