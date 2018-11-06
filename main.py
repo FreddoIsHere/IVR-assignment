@@ -23,8 +23,12 @@ class MainReacher():
         mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
-        cx = int(M['m10']/M['m00'])
-        cy = int(M['m01']/M['m00'])
+        try:
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        except ZeroDivisionError:
+            print("Got zero division error for red")
+            return self.prevPos[0]
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -35,8 +39,12 @@ class MainReacher():
         mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
-        cx = int(M['m10']/M['m00'])
-        cy = int(M['m01']/M['m00'])
+        try:
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        except ZeroDivisionError:
+            print("Got zero division error for green")
+            return self.prevPos[1]
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -46,9 +54,13 @@ class MainReacher():
         mask = cv2.dilate(mask,kernel,iterations=2)
         mask=cv2.erode(mask,kernel,iterations=3)
 
-        M = cv2.moments(mask)
-        cx = int(M['m10']/M['m00'])
-        cy = int(M['m01']/M['m00'])
+        try:
+            M = cv2.moments(mask)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        except ZeroDivisionError:
+            print("Got zero division error for blue")
+            return self.prevPos[2]
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -58,9 +70,13 @@ class MainReacher():
         mask = cv2.dilate(mask,kernel,iterations=2)
         mask=cv2.erode(mask,kernel,iterations=3)
 
-        M = cv2.moments(mask)
-        cx = int(M['m10']/M['m00'])
-        cy = int(M['m01']/M['m00'])
+        try:
+            M = cv2.moments(mask)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        except ZeroDivisionError:
+            print("Got zero division error for end")
+            return self.prevPos[3]
 
         return self.coordinate_convert(np.array([cx,cy]))
 
@@ -160,6 +176,7 @@ class MainReacher():
         redxz = self.detect_red(xzarray)
         ja1 = math.atan2(redxz[1],redxz[0])
 
+
         centreOfArm = (0.5,0)
 
         greenxy = self.detect_green(xyarray)
@@ -176,6 +193,7 @@ class MainReacher():
         ja4 = self.angle_normalize(ja4)
 
         #print(str([ja1, ja2, ja3, ja4]))
+        self.prevPos = [redxz,greenxy,bluexy,endxz]
 
         return np.array([ja1, ja2, ja3, ja4])
 
