@@ -8,7 +8,7 @@
 ### Already have an installed simulator
 If have already an installed simulator through the lab sessions, you only need to move some files across and install one additional package. To do this follow these steps:
 
-1. Clone the assignment repo: `git clone https://github.com/ccimrie/IVR-assignmnet`
+1. Clone the assignment repo: `git clone https://github.com/ccimrie/IVR-assignment`
 2. Change the name of your main.py within your IVR-Labs folder: `mv /path/to/folder/IVR-Labs/main.py /path/to/folder/IVR-Labs/main-labs.py`
 3. Copy across the assignment files: `cp -r /path/to/assignment/IVR-assignment/reacher3D /path/to/folder/IVR-Labs && cp /path/to/assignment/IVR-assignment/main.py /path/to/folder/IVR-Labs`
 4. Run the command: `WS=$PWD`
