@@ -47,9 +47,9 @@ class MainReacher():
         return rot*trans
     
     def rot_y(self, angle):
-        rot = np.matrix([[np.cos(angle), 0, -np.sin(angle), 0],
+        rot = np.matrix([[np.cos(angle), 0, np.sin(angle), 0],
                         [0, 1, 0, 0],
-                        [np.sin(angle), 0, np.cos(angle), 0],
+                        [-np.sin(angle), 0, np.cos(angle), 0],
                         [0, 0, 0, 1]])
         return rot
         
@@ -75,17 +75,18 @@ class MainReacher():
         jacobian[0:3, 0] = np.cross(z0_vector, pos3D)
         pos3D[0:3] = (ee_pos-j2_pos).T
     
-        z1_vector = (j1_trans*np.array([0, 0, 1, 0]).reshape(4,1))[0:3].T
+        #z1_vector = (j1_trans*np.array([0, 0, 1, 0]).reshape(4,1))[0:3].T
+        z1_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
         
         jacobian[0:3, 1] = np.cross(z1_vector, pos3D)
         pos3D[0:3] = (ee_pos-j3_pos).T
         
-        z2_vector = (j1_trans*j2_trans*np.array([0, 0, 1, 0]).reshape(4,1))[0:3].T
+        z2_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
         
         jacobian[0:3, 2] = np.cross(z2_vector, pos3D)
         pos3D[0:3] = (ee_pos-j4_pos).T
         
-        z3_vector = (j1_trans*j2_trans*j3_trans*np.array([0, 1, 0, 0]).reshape(4,1))[0:3].T
+        z3_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*self.rot_z(joint_angles[2])[0:3, 0:3]*np.array([0, 1, 0]).reshape(3,1))[0:3].T
         
         jacobian[0:3, 3] = np.cross(z3_vector, pos3D)
         
@@ -104,7 +105,7 @@ class MainReacher():
         
         Jac = np.matrix(self.Jacobian(current_joint_angles))[0:3, :]
         
-        if np.linalg.det(Jac*Jac.T) == 0:
+        if (np.linalg.matrix_rank(Jac,0.4)<3):
             Jac_inv = Jac.T
             #Jac_inv = np.linalg.pinv(Jac, rcond=0.99999)
         else:
@@ -151,9 +152,9 @@ class MainReacher():
             arrxy,arrxz = self.env.render('rgb-array')     
          
             detectedJointAngles = self.env.ground_truth_joint_angles
-            ee_target = self.env.ground_truth_valid_target
+            x, y, z = self.env.ground_truth_valid_target
 
-            jointAngles = self.IK(detectedJointAngles,ee_target, arrxy, arrxz)
+            jointAngles = self.IK(detectedJointAngles,[x, y, -z], arrxy, arrxz)
             
             detectedJointVels = self.angle_normalize(detectedJointAngles-prevJointAngles)/dt
             
