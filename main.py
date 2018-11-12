@@ -188,31 +188,38 @@ class MainReacher():
             print("Estimated ja1")
             ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
+        # Used to determine whether axis have flipped
+        if type(greenxz) == np.ndarray and type (redxz) == np.ndarray:
+            ja2_other_plane = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
+            # Keep track of previous in case the joint becomes obscured briefly, as otherwise leads to massive jolt
+            # if we instead do not adjust the angle
+            self.prev_ja2_other_plane = ja2_other_plane
+        else:
+            ja2_other_plane = self.prev_ja2_other_plane
 
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
-            print("Position of red: %s"%redxy)
-            print("Position of green: %s"%greenxy)
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
-            if type(greenxz) == np.ndarray and type (redxz) == np.ndarray:
-                ja2_other_plane = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
-                # Keep track of previous in case the joint becomes obscured briefly, as otherwise leads to massive jolt
-                # if we instead do not adjust the angle
-                self.prev_ja2_other_plane = ja2_other_plane
-            else:
-                ja2_other_plane = self.prev_ja2_other_plane
             if ja2_other_plane>math.pi/2:
-                ja2=(ja2)*-1+math.atan2(redxy[1],redxy[0])
+                ja2=(ja2)*-1+math.pi
             if ja2_other_plane<-math.pi/2:
-                ja2=(ja2)*-1-math.atan2(redxy[1],redxy[0])
-
+                ja2=(ja2)*-1-math.pi
+            # Normalize again as when close to 0 sometimes gives angle of 2pi
+            ja2 = self.angle_normalize(ja2)
         else:
             print("Estimated ja2")
             ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
 
 
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
-            ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
+            ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
+            if ja2_other_plane>math.pi/2:
+                print("BREAK - GREATER THAN")
+                ja3 = ja3*-1-math.pi
+            if ja2_other_plane<-math.pi/2:
+                print("BREAK - LESS THAN")
+                ja3 = ja3*-1+math.pi
+            ja3 -= ja2
             ja3 = self.angle_normalize(ja3)
         else:
             print("Estimated ja3")
@@ -290,7 +297,7 @@ class MainReacher():
             else:
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
-                detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
+                #detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
                 detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
@@ -299,18 +306,19 @@ class MainReacher():
             #print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
             #print("Predicted velocity: %s" % detectedJointVels)
             #print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
-            print("Predicted angle of green: %s, True angle of green: %s" % (detectedJointAngles[1],self.env.ground_truth_joint_angles[1]))
-            print("Predicted velocity of green: %s, True velocity of green: %s" % (detectedJointVels[1],self.env.ground_truth_joint_velocities[1]))
+            print("Predicted angle of 2nd: %s, True angle of 2nd: %s" % (detectedJointAngles[1],self.env.ground_truth_joint_angles[1]))
+            print("Predicted angle of 3rd: %s, True angle of 3rd: %s" % (detectedJointAngles[2],self.env.ground_truth_joint_angles[2]))
+            print("Predicted velocity of 3rd: %s, True velocity of 3rd: %s" % (detectedJointVels[2],self.env.ground_truth_joint_velocities[2]))
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
             print(i)
-            #if i>30:
-            #    time.sleep(1)
-            #    self.start = True
-            desired_joint_angles = np.array([math.pi, 0, math.pi/2, 0])
+            if i>25:
+                #time.sleep(1)
+                self.start = True
+            desired_joint_angles = np.array([math.pi, math.pi/4, -math.pi/2, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
