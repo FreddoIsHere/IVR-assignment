@@ -195,11 +195,16 @@ class MainReacher():
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
             if type(greenxz) == np.ndarray and type (redxz) == np.ndarray:
-                green_ang_xz = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
-                if green_ang_xz>math.pi/2:
-                    ja2=(ja2)*-1+math.atan2(redxy[1],redxy[0])
-                if green_ang_xz<math.pi/2:
-                    ja2=(ja2)*-1-math.atan2(redxy[1],redxy[0])
+                ja2_other_plane = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
+                # Keep track of previous in case the joint becomes obscured briefly, as otherwise leads to massive jolt
+                # if we instead do not adjust the angle
+                self.prev_ja2_other_plane = ja2_other_plane
+            else:
+                ja2_other_plane = self.prev_ja2_other_plane
+            if ja2_other_plane>math.pi/2:
+                ja2=(ja2)*-1+math.atan2(redxy[1],redxy[0])
+            if ja2_other_plane<-math.pi/2:
+                ja2=(ja2)*-1-math.atan2(redxy[1],redxy[0])
 
         else:
             print("Estimated ja2")
@@ -209,9 +214,6 @@ class MainReacher():
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
             ja3 = self.angle_normalize(ja3)
-            if abs(ja3-self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt))>math.pi/2:
-                print("Estimated ja3 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt),ja3))
-                #ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
         else:
             print("Estimated ja3")
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
@@ -219,9 +221,6 @@ class MainReacher():
         if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
             ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])-ja1
             ja4 = self.angle_normalize(ja4)
-            if abs(ja4-self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt))>math.pi/2:
-                print("Estimated ja4 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt),ja4))
-                #ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
         else:
             print("Estimated ja4")
             ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
@@ -311,7 +310,7 @@ class MainReacher():
             #if i>30:
             #    time.sleep(1)
             #    self.start = True
-            desired_joint_angles = np.array([math.pi, -math.pi/2, math.pi/2, math.pi/2])
+            desired_joint_angles = np.array([math.pi, 0, math.pi/2, 0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
