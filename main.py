@@ -175,46 +175,53 @@ class MainReacher():
 
 
         redxz = self.detect_red(xzarray)
+        greenxy = self.detect_green(xyarray)
+        greenxz = self.detect_green(xzarray)
+        redxy = self.detect_red(xyarray)
+        bluexy = self.detect_blue(xyarray, lumi1)
+        endxz = self.detect_end(xzarray, lumi2)
+        bluexz = self.detect_blue(xzarray, lumi2)
+
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
-            if abs(ja1-self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt))>math.pi/2:
-                print("Estimated ja1 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt),ja1))
-                ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
         else:
             print("Estimated ja1")
             ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
-        greenxy = self.detect_green(xyarray)
-        redxy = self.detect_red(xyarray)
+
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
+            print("Position of red: %s"%redxy)
+            print("Position of green: %s"%greenxy)
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
-            if abs(ja2-self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt))>math.pi/2:
-                print("Estimated ja2 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt),ja2))
-                ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
+            if type(greenxz) == np.ndarray and type (redxz) == np.ndarray:
+                green_ang_xz = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
+                if green_ang_xz>math.pi/2:
+                    ja2=(ja2)*-1+math.atan2(redxy[1],redxy[0])
+                if green_ang_xz<math.pi/2:
+                    ja2=(ja2)*-1-math.atan2(redxy[1],redxy[0])
+
         else:
             print("Estimated ja2")
             ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
 
-        bluexy = self.detect_blue(xyarray, lumi1)
+
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])-ja2
             ja3 = self.angle_normalize(ja3)
             if abs(ja3-self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt))>math.pi/2:
                 print("Estimated ja3 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt),ja3))
-                ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
+                #ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
         else:
             print("Estimated ja3")
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
 
-        endxz = self.detect_end(xzarray, lumi2)
-        bluexz = self.detect_blue(xzarray, lumi2)
         if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
             ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])-ja1
             ja4 = self.angle_normalize(ja4)
             if abs(ja4-self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt))>math.pi/2:
                 print("Estimated ja4 as sudden change, expected angle %s, got angle %s" % (self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt),ja4))
-                ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
+                #ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
         else:
             print("Estimated ja4")
             ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
@@ -283,23 +290,28 @@ class MainReacher():
                 detectedJointVels = np.zeros(4)
             else:
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
+                #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
+                detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
+                detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
-            print("Actual angles: %s" % self.env.ground_truth_joint_angles)
-            print("Predicted angles %s" % detectedJointAngles)
-            print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
-            print("Predicted velocity: %s" % detectedJointVels)
-            print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
+            #print("Actual angles: %s" % self.env.ground_truth_joint_angles)
+            #print("Predicted angles %s" % detectedJointAngles)
+            #print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
+            #print("Predicted velocity: %s" % detectedJointVels)
+            #print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
+            print("Predicted angle of green: %s, True angle of green: %s" % (detectedJointAngles[1],self.env.ground_truth_joint_angles[1]))
+            print("Predicted velocity of green: %s, True velocity of green: %s" % (detectedJointVels[1],self.env.ground_truth_joint_velocities[1]))
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
-            if i>140:
-                print(i)
-                #time.sleep(1)
-                self.start = True
-            desired_joint_angles = np.array([math.pi, 0, 0, -math.pi/2])
+            print(i)
+            #if i>30:
+            #    time.sleep(1)
+            #    self.start = True
+            desired_joint_angles = np.array([math.pi, -math.pi/2, math.pi/2, math.pi/2])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
