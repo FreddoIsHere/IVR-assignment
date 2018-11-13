@@ -114,7 +114,7 @@ class MainReacher():
     def detect_target(self, image, lumi):
         a = 140 *lumi
         b = 190 *lumi
-        mask = cv2.inRange(imagae, (a,a,a),(b,b,b))
+        mask = cv2.inRange(image, (a,a,a),(b,b,b))
         im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         image = image.copy()
 
