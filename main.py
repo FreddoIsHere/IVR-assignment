@@ -19,8 +19,29 @@ class MainReacher():
     def detect_red(self, image): # xz-image
         mask = cv2.inRange(image, (20, 0, 0),(255, 0, 0))
         kernel = np.ones((5,5),np.uint8)
-        mask = cv2.dilate(mask,kernel,iterations=2)
-        mask=cv2.erode(mask,kernel,iterations=3)
+        #mask = cv2.dilate(mask,kernel,iterations=2)
+        #mask=cv2.erode(mask,kernel,iterations=3)
+
+        M = cv2.moments(mask)
+        try:
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        except ZeroDivisionError:
+            print("Got zero division error for red")
+            return None
+
+        return self.coordinate_convert(np.array([cx,cy]))
+
+    def detect_rod1(self, image, lumi):
+        a = 0
+        b = 139 * lumi
+        mask = cv2.inRange(image, (a, a, a),(b, b, b))
+        kernel = np.ones((5,5),np.uint8)
+        #mask = cv2.dilate(mask,kernel,iterations=2)
+        #mask=cv2.erode(mask,kernel,iterations=3)
+
+        #cv2.imshow("Rods",mask)
+        #cv2.waitKey(0)
 
         M = cv2.moments(mask)
         try:
@@ -35,8 +56,8 @@ class MainReacher():
     def detect_green(self, image):
         mask = cv2.inRange(image, (0, 20, 0),(0, 255, 0))
         kernel = np.ones((5,5),np.uint8)
-        mask = cv2.dilate(mask,kernel,iterations=2)
-        mask=cv2.erode(mask,kernel,iterations=3)
+        #mask = cv2.dilate(mask,kernel,iterations=2)
+        #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
         try:
@@ -51,8 +72,8 @@ class MainReacher():
     def detect_blue(self, image, lumi):
         mask = cv2.inRange(image, (0,0,200*lumi),(0,0,255))
         kernel = np.ones((5,5),np.uint8)
-        mask = cv2.dilate(mask,kernel,iterations=2)
-        mask=cv2.erode(mask,kernel,iterations=3)
+        #mask = cv2.dilate(mask,kernel,iterations=2)
+        #mask=cv2.erode(mask,kernel,iterations=3)
 
         try:
             M = cv2.moments(mask)
@@ -67,8 +88,8 @@ class MainReacher():
     def detect_end(self, image, lumi):
         mask = cv2.inRange(image, (0,0,5),(0,0,140*lumi))
         kernel = np.ones((5,5),np.uint8)
-        mask = cv2.dilate(mask,kernel,iterations=2)
-        mask=cv2.erode(mask,kernel,iterations=3)
+        #mask = cv2.dilate(mask,kernel,iterations=2)
+        #mask=cv2.erode(mask,kernel,iterations=3)
 
         try:
             M = cv2.moments(mask)
@@ -182,6 +203,8 @@ class MainReacher():
         endxz = self.detect_end(xzarray, lumi2)
         bluexz = self.detect_blue(xzarray, lumi2)
 
+        self.detect_rod1(xzarray,lumi2)
+
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
         else:
@@ -193,16 +216,30 @@ class MainReacher():
             ja2_other_plane = self.angle_normalize(math.atan2(greenxz[1]-redxz[1],greenxz[0]-redxz[0]))
             # Keep track of previous in case the joint becomes obscured briefly, as otherwise leads to massive jolt
             # if we instead do not adjust the angle
-            self.prev_ja2_other_plane = ja2_other_plane
+            if greenxz[1]-redxz[1]>0:
+                up = True
+            else:
+                up = False
+            if greenxz[0]-redxz[0]<0:
+                left = True
+            else:
+                left = False
+            self.prev_up = up
+            self.prev_left = left
         else:
-            ja2_other_plane = self.prev_ja2_other_plane
+            print("Used previous val for ja2_other_plane")
+            up = self.prev_up
+            left = self.prev_left
 
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
+            print("Green pos: %s, Red pos: %s"%(greenxy,redxy))
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             ja2 = self.angle_normalize(ja2)
-            if ja2_other_plane>math.pi/2:
+            if up and left:
+                print("Greater than")
                 ja2=(ja2)*-1+math.pi
-            if ja2_other_plane<-math.pi/2:
+            if not up and left:
+                print("Less than")
                 ja2=(ja2)*-1-math.pi
             # Normalize again as when close to 0 sometimes gives angle of 2pi
             ja2 = self.angle_normalize(ja2)
@@ -213,14 +250,13 @@ class MainReacher():
 
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
-            if ja2_other_plane>math.pi/2:
-                print("BREAK - GREATER THAN")
+            if up and left:
                 ja3 = ja3*-1-math.pi
-            if ja2_other_plane<-math.pi/2:
-                print("BREAK - LESS THAN")
+            if not up and left:
                 ja3 = ja3*-1+math.pi
             ja3 -= ja2
             ja3 = self.angle_normalize(ja3)
+
         else:
             print("Estimated ja3")
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
@@ -298,27 +334,24 @@ class MainReacher():
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
                 #detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
-                detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
+                #detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
-            #print("Actual angles: %s" % self.env.ground_truth_joint_angles)
-            #print("Predicted angles %s" % detectedJointAngles)
+            print("Actual angles: %s" % self.env.ground_truth_joint_angles)
+            print("Predicted angles %s" % detectedJointAngles)
             #print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
             #print("Predicted velocity: %s" % detectedJointVels)
             #print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
-            print("Predicted angle of 2nd: %s, True angle of 2nd: %s" % (detectedJointAngles[1],self.env.ground_truth_joint_angles[1]))
-            print("Predicted angle of 3rd: %s, True angle of 3rd: %s" % (detectedJointAngles[2],self.env.ground_truth_joint_angles[2]))
-            print("Predicted velocity of 3rd: %s, True velocity of 3rd: %s" % (detectedJointVels[2],self.env.ground_truth_joint_velocities[2]))
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
             print(i)
-            if i>25:
+            if i>45:
                 #time.sleep(1)
                 self.start = True
-            desired_joint_angles = np.array([math.pi, math.pi/4, -math.pi/2, 0])
+            desired_joint_angles = np.array([math.pi,math.pi/4,math.pi/8,math.pi/8])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
