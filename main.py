@@ -16,27 +16,6 @@ class MainReacher():
         img = cv2.cvtColor(image, cv2.COLOR_RGB2Lab)
         return (np.mean(img[:,:,0])/255)
 
-    def detect_rod1(self, image, lumi):
-        a = 0
-        b = 139 * lumi
-        mask = cv2.inRange(image, (a, a, a),(b, b, b))
-        kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=2)
-        #mask=cv2.erode(mask,kernel,iterations=3)
-
-        #cv2.imshow("Rods",mask)
-        #cv2.waitKey(0)
-
-        M = cv2.moments(mask)
-        try:
-            cx = int(M['m10']/M['m00'])
-            cy = int(M['m01']/M['m00'])
-        except ZeroDivisionError:
-            print("Got zero division error for red")
-            return None
-
-        return self.coordinate_convert(np.array([cx,cy]))
-
     def detect_red(self, image): # xz-image
         mask = cv2.inRange(image, (20, 0, 0),(255, 0, 0))
         kernel = np.ones((5,5),np.uint8)
@@ -44,13 +23,24 @@ class MainReacher():
         #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
-        if M['m00'] != 0: # If true then joint partially visible at least
+        if M['m00'] != 0:
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
             # We use matching (as opposed to moments) with the template to improve
             # approximating centre of circle when it is eclipsed by another joint
-            res = cv2.matchTemplate(mask.astype(np.uint8),self.red_temp,cv2.TM_CCOEFF)
+            # Use sub_mask to minimize search space, saving time
+            lower_x = cx-51
+            if lower_x<0:
+                lower_x = 0
+            lower_y = cy-51
+            if lower_y<0:
+                lower_y = 0
+            sub_mask = mask[lower_y:cy+51,lower_x:cx+51]
+            res = cv2.matchTemplate(sub_mask,self.red_temp,cv2.TM_CCOEFF)
             _, _, _, loc = cv2.minMaxLoc(res)
-            cx = loc[0]+26
-            cy = loc[1]+26
+            # Add lower_x for offset caused by submask, add 26 to get to centre of template
+            cx = loc[0]+lower_x+26
+            cy = loc[1]+lower_y+26
         else:
             print("Got zero division error for red")
             return None
@@ -65,10 +55,19 @@ class MainReacher():
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
-            res = cv2.matchTemplate(mask.astype(np.uint8),self.green_temp,cv2.TM_CCOEFF)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            lower_x = cx-45
+            if lower_x<0:
+                lower_x = 0
+            lower_y = cy-45
+            if lower_y<0:
+                lower_y = 0
+            sub_mask = mask[lower_y:cy+45,lower_x:cx+45]
+            res = cv2.matchTemplate(sub_mask,self.green_temp,cv2.TM_CCOEFF)
             _, _, _, loc = cv2.minMaxLoc(res)
-            cx = loc[0]+23
-            cy = loc[1]+23
+            cx = loc[0]+lower_x+23
+            cy = loc[1]+lower_y+23
         else:
             print("Got zero division error for green")
             return None
@@ -83,10 +82,19 @@ class MainReacher():
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
-            res = cv2.matchTemplate(mask.astype(np.uint8),self.blue_temp,cv2.TM_CCOEFF)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            lower_x = cx-37
+            if lower_x<0:
+                lower_x = 0
+            lower_y = cy-37
+            if lower_y<0:
+                lower_y = 0
+            sub_mask = mask[lower_y:cy+37,lower_x:cx+37]
+            res = cv2.matchTemplate(sub_mask,self.blue_temp,cv2.TM_CCOEFF)
             _, _, _, loc = cv2.minMaxLoc(res)
-            cx = loc[0]+19
-            cy = loc[1]+19
+            cx = loc[0]+lower_x+19
+            cy = loc[1]+lower_y+19
         else:
             print("Got zero division error for blue")
             return None
@@ -101,10 +109,19 @@ class MainReacher():
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
-            res = cv2.matchTemplate(mask.astype(np.uint8),self.end_temp,cv2.TM_CCOEFF)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            lower_x = cx-29
+            if lower_x<0:
+                lower_x = 0
+            lower_y = cy-29
+            if lower_y<0:
+                lower_y = 0
+            sub_mask = mask[lower_y:cy+29,lower_x:cx+29]
+            res = cv2.matchTemplate(sub_mask,self.end_temp,cv2.TM_CCOEFF)
             _, _, _, loc = cv2.minMaxLoc(res)
-            cx = loc[0]+14
-            cy = loc[1]+14
+            cx = loc[0]+lower_x+14
+            cy = loc[1]+lower_y+14
         else:
             print("Got zero division error for end")
             return None
@@ -215,8 +232,6 @@ class MainReacher():
         bluexy = self.detect_blue(xyarray, lumi1)
         endxz = self.detect_end(xzarray, lumi2)
         bluexz = self.detect_blue(xzarray, lumi2)
-
-        self.detect_rod1(xzarray,lumi2)
 
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
