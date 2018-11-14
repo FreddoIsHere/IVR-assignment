@@ -255,7 +255,7 @@ class MainReacher():
         
         x, y, z, k = self.env.ground_truth_joint_angles
 
-        return np.array([ja1, ja2, ja3, ja4])
+        return np.array([ja1, ja2, ja3, k])
     
     def get_target_coords(self, xyarray, xzarray):
         lumi1 = self.get_illumination(xyarray)
@@ -398,14 +398,17 @@ class MainReacher():
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
+        target = [0, 0, 0]
 
         for i in range(100000):
             dt = self.env.dt
             arrxy,arrxz = self.env.render('rgb-array')     
             detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
-            x, y, z = self.env.ground_truth_valid_target
+            
+            if i > 1:
+                target = self.get_target_coords(arrxy, arrxz)
 
-            jointAngles = self.IK(detectedJointAngles,[x, y, z])
+            jointAngles = self.IK(detectedJointAngles, target)
             
             detectedJointVels = self.angle_normalize(detectedJointAngles-prevJointAngles)/dt
             
