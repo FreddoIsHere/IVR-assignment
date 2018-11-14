@@ -41,6 +41,10 @@ class MainReacher():
             # Add lower_x for offset caused by submask, add 26 to get to centre of template
             cx = loc[0]+lower_x+26
             cy = loc[1]+lower_y+26
+            if self.prnt:
+                print("Redxy: %s"%([cx,cy]))
+            else:
+                print("Redxz: %s"%([cx,cy]))
         else:
             print("Got zero division error for red")
             return None
@@ -57,6 +61,9 @@ class MainReacher():
         if M['m00'] != 0:
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
+            if self.show:
+                self.green_mask = mask
+                print("Expected position of green to be %s"%self.coordinate_convert(np.array([cx,cy])))
             lower_x = cx-45
             if lower_x<0:
                 lower_x = 0
@@ -68,6 +75,8 @@ class MainReacher():
             _, _, _, loc = cv2.minMaxLoc(res)
             cx = loc[0]+lower_x+23
             cy = loc[1]+lower_y+23
+            if self.prnt:
+                print("Greenxy: %s"%([cx,cy]))
         else:
             print("Got zero division error for green")
             return None
@@ -95,6 +104,10 @@ class MainReacher():
             _, _, _, loc = cv2.minMaxLoc(res)
             cx = loc[0]+lower_x+19
             cy = loc[1]+lower_y+19
+            if self.prnt:
+                print("Bluexy: %s"%([cx,cy]))
+            else:
+                print("Bluexz: %s"%([cx,cy]))
         else:
             print("Got zero division error for blue")
             return None
@@ -111,17 +124,18 @@ class MainReacher():
         if M['m00'] != 0:
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
-            lower_x = cx-29
+            lower_x = cx-27
             if lower_x<0:
                 lower_x = 0
-            lower_y = cy-29
+            lower_y = cy-27
             if lower_y<0:
                 lower_y = 0
-            sub_mask = mask[lower_y:cy+29,lower_x:cx+29]
+            sub_mask = mask[lower_y:cy+27,lower_x:cx+27]
             res = cv2.matchTemplate(sub_mask,self.end_temp,cv2.TM_CCOEFF)
             _, _, _, loc = cv2.minMaxLoc(res)
             cx = loc[0]+lower_x+14
             cy = loc[1]+lower_y+14
+            print("Endxz: %s"%([cx,cy]))
         else:
             print("Got zero division error for end")
             return None
@@ -222,16 +236,25 @@ class MainReacher():
         lumi2 = self.get_illumination(xzarray)
 
         self.show = False
+        self.prnt = False
 
-        redxz = self.detect_red(xzarray)
-        greenxy = self.detect_green(xyarray)
         greenxz = self.detect_green(xzarray)
+        self.prnt = True
         self.show = True
-        redxy = self.detect_red(xyarray)
+        greenxy = self.detect_green(xyarray)
         self.show = False
+        redxy = self.detect_red(xyarray)
+        redxy[1] = 0 # Know y coord should always be 0 as can't move in xy plane
+        if redxy is not None:
+            redxy_ang = math.atan2(redxy[1],redxy[0])
+            self.prev_redxy_ang = redxy_ang
+        else:
+            redxy_angle = self.prev_redxy_ang
         bluexy = self.detect_blue(xyarray, lumi1)
-        endxz = self.detect_end(xzarray, lumi2)
+        self.prnt = False
+        redxz = self.detect_red(xzarray)
         bluexz = self.detect_blue(xzarray, lumi2)
+        endxz = self.detect_end(xzarray, lumi2)
 
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
@@ -249,31 +272,44 @@ class MainReacher():
             print("Used previous val for ja2_other_plane")
             ja2_other_plane = self.prev_ja2_other_plane = ja2_other_plane
 
+        print("Other angle: %s"%ja2_other_plane)
+
         if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
-            print("Green pos: %s, Red pos: %s"%(greenxy,redxy))
-            ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
-            ja2 = self.angle_normalize(ja2)
-            if ja2_other_plane>math.pi/2:
-                print("Greater than")
-                ja2=(ja2)*-1+math.pi
-            if ja2_other_plane<-math.pi/2:
-                print("Less than")
-                ja2=(ja2)*-1-math.pi
-            # Normalize again as when close to 0 sometimes gives angle of 2pi
-            ja2 = self.angle_normalize(ja2)
+            print("Coords of greenxy: %s"%greenxy)
+            if greenxy[1]==0:
+                ja2 = 0
+            elif greenxy[0]-redxy[0]==0:
+                if greenxy[1]>0:
+                    ja2 = math.pi/2
+                else:
+                    ja2 = -math.pi/2
+            else:
+                ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
+                ja2 = self.angle_normalize(ja2)
+                if greenxy[0]<0 and greenxy[1]>0:
+                    print("Greater than")
+                    ja2=(ja2)*-1+self.prev_redxy_ang
+                if greenxy[0]<0 and greenxy[1]<0:
+                    print("Less than")
+                    ja2=(ja2)*-1-self.prev_redxy_ang
+                # Normalize again as when close to 0 sometimes gives angle of 2pi
+                ja2 = self.angle_normalize(ja2)
         else:
             print("Estimated ja2")
             ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
 
 
         if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
-            ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
-            if ja2_other_plane>math.pi/2:
-                ja3 = ja3*-1-math.pi
-            if ja2_other_plane<-math.pi/2:
-                ja3 = ja3*-1+math.pi
-            ja3 -= ja2
-            ja3 = self.angle_normalize(ja3)
+            if greenxy[1] == 0 and bluexy[1] == 0:
+                ja3 = 0
+            else:
+                ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
+                if bluexy[0]<0 and bluexy[1]>0:
+                    ja3 = ja3*-1-self.prev_redxy_ang
+                if bluexy[0]<0 and bluexy[1]<0:
+                    ja3 = ja3*-1+self.prev_redxy_ang
+                ja3 -= ja2
+                ja3 = self.angle_normalize(ja3)
 
         else:
             print("Estimated ja3")
@@ -281,6 +317,7 @@ class MainReacher():
 
         if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
             ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])-ja1
+            print("Ja4 unormalized: %s"%(ja4+ja1))
             ja4 = self.angle_normalize(ja4)
         else:
             print("Estimated ja4")
@@ -313,8 +350,6 @@ class MainReacher():
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
 
-        self.start = False
-
         self.red_temp = np.zeros((52,52))
         self.red_temp = cv2.circle(self.red_temp,(26,26),25,1,-1).astype(np.uint8)
         self.green_temp = np.zeros((46,46))
@@ -323,6 +358,8 @@ class MainReacher():
         self.blue_temp = cv2.circle(self.blue_temp,(19,19),18,1,-1).astype(np.uint8)
         self.end_temp = np.zeros((28,28))
         self.end_temp = cv2.circle(self.end_temp,(14,14),13,1,-1).astype(np.uint8)
+
+        self.green_mask = None
 
         for i in range(100000):
             #The change in time between iterations can be found in the self.env.dt variable
@@ -360,7 +397,7 @@ class MainReacher():
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
                 #detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
-                detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
+                #detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
 
             print("Actual angles: %s" % self.env.ground_truth_joint_angles)
@@ -368,16 +405,19 @@ class MainReacher():
             #print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
             #print("Predicted velocity: %s" % detectedJointVels)
             #print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
+            #if self.green_mask is not None:
+                #cv2.imshow("Green mask",self.green_mask)
+                #cv2.imshow("Redxy",arrxy)
+                #cv2.waitKey(0)
             print("------------------------------")
             #if (detectedJointAngles[1]<-0.719 or start):
             #    cv2.imshow('Nothing',np.zeros(5))
             #    cv2.waitKey(0)
             #    start = True
             print(i)
-            if i>45:
+            #if i>25:
                 #time.sleep(1)
-                self.start = True
-            desired_joint_angles = np.array([math.pi/4,math.pi/4,math.pi/4,math.pi/4])
+            desired_joint_angles = np.array([0,0,1.4,-math.pi/2])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
