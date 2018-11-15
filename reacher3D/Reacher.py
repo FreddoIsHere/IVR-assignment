@@ -122,7 +122,7 @@ class ReacherEnv(gym.Env):
 
     def enable_gravity(self,on):
         if on:
-            self.world.setGravity((0,-9.81,0))
+            self.world.setGravity((0,0,-9.81))
         else:
             self.world.setGravity((0,0,0))
 
