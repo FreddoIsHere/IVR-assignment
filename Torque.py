@@ -168,22 +168,23 @@ class MainReacher():
         j2_pos = (j1_trans)[0:3, 3]
         j1_pos = np.zeros((3,1))
         
-        p14 = ((ee_pos - j4_pos)/2 + j4_pos)#.flatten()
-        p13 = ((j4_pos - j3_pos)/2 + j3_pos)#.flatten()
-        p12 = ((j3_pos - j2_pos)/2 + j2_pos)#.flatten()
-        p11 = ((j2_pos - j1_pos)/2 + j1_pos)#.flatten()
+        p14 = ((ee_pos - j4_pos)/2 + j4_pos).flatten()
+        p13 = ((j4_pos - j3_pos)/2 + j3_pos).flatten()
+        p12 = ((j3_pos - j2_pos)/2 + j2_pos).flatten()
+        p11 = ((j2_pos - j1_pos)/2 + j1_pos).flatten()
         
-        p24 = ((ee_pos - j4_pos)/2 + j4_pos -j2_pos)#.flatten()
-        p23 = ((j4_pos - j3_pos)/2 + j3_pos -j2_pos)#.flatten()
-        p22 = ((j3_pos - j2_pos)/2 + j2_pos -j2_pos)#.flatten()
+        p24 = ((ee_pos - j4_pos)/2 + j4_pos -j2_pos).flatten()
+        p23 = ((j4_pos - j3_pos)/2 + j3_pos -j2_pos).flatten()
+        p22 = ((j3_pos - j2_pos)/2 + j2_pos -j2_pos).flatten()
         
-        p34 = ((ee_pos - j4_pos)/2 + j4_pos - j3_pos)#.flatten()
-        p33 = ((j4_pos - j3_pos)/2 + j3_pos - j3_pos)#.flatten()
+        p34 = ((ee_pos - j4_pos)/2 + j4_pos - j3_pos).flatten()
+        p33 = ((j4_pos - j3_pos)/2 + j3_pos - j3_pos).flatten()
         
-        p44 = ((ee_pos - j4_pos)/2)#.flatten()
+        p44 = ((ee_pos - j4_pos)/2).flatten()
     
 
         grav = np.array([0, 0, -m*g])
+        
         
         '''
         print('link-centres:')
@@ -197,17 +198,25 @@ class MainReacher():
         print(p44)
         '''
         
-        
-        '''
-        t4 = (np.cross(p44, grav))[0][1]
+        z0 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * np.array([0, -1, 0]).reshape(3,1)).flatten())[0]
     
-        t3 = (np.cross(p33, grav) + np.cross(p34, grav))[0][1]
+        z1 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * np.array([0, 0, 1]).reshape(3,1)).flatten())[0]
+       
+        z2 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * self.rot_z(joint_angles[2])[0:3, 0:3] * np.array([0, 0, 1]).reshape(3,1)).flatten())[0]
         
-        t2 = (np.cross(p22, grav) + np.cross(p23, grav) + np.cross(p24, grav))[0][1]
+        z3 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * self.rot_z(joint_angles[2])[0:3, 0:3] * self.rot_y(joint_angles[3])[0:3, 0:3] * np.array([0, -1, 0]).reshape(3, 1)).flatten())[0]
+               
         
-        t1 = (np.cross(p11, grav) + np.cross(p12, grav) + np.cross(p13, grav) + np.cross(p14, grav))[0][1]
+        t4 = np.dot(z3, np.cross(p44, grav)[0, 0:3])
+    
+        t3 = np.dot(z2, np.cross(p33, grav)[0, 0:3]) + np.dot(z2, np.cross(p34, grav)[0, 0:3])
+        
+        t2 = np.dot(z1, np.cross(p22, grav)[0, 0:3]) + np.dot(z1, np.cross(p23, grav)[0, 0:3]) + np.dot(z1, np.cross(p24, grav)[0, 0:3])
+
+        t1 = np.dot(z0, np.cross(p11, grav)[0, 0:3]) + np.dot(z0, np.cross(p12, grav)[0, 0:3]) + np.dot(z0, np.cross(p13, grav)[0, 0:3]) + np.dot(z0, np.cross(p14, grav)[0, 0:3])
+        
+        
         '''
-        
         t1 = np.array(-grav *p14 - grav*p13 - grav*p12 - grav*p11)[0][0]
         
         t2 = np.array(-grav *p24 - grav*p23 - grav*p22)[0][0]
@@ -215,6 +224,22 @@ class MainReacher():
         t3 = np.array(-grav *p34 - grav*p33)[0][0]
         
         t4 = np.array(- grav*p44)[0][0]
+        '''
+    
+        '''
+        print('4th-t:', t4)
+        print('z3:', z3)
+        print('p44', p44)
+        print('3th-t:', t3)
+        print('z2:', z2)
+        print('p33, p34', p33, p34)
+        print('2th-t:', t2)
+        print('z1:', z1)
+        print('p22, p23, p24', p22, p23, p24)
+        print('1th-t:', t1)
+        print('z0:', z0)
+        print('p11, p12, p13, p14', p11, p12, p13, p14)
+        '''
         
         return np.matrix([t1, t2, t3, t4]).T
 
@@ -239,7 +264,7 @@ class MainReacher():
 
         # Uncomment to have gravity act in the z-axis
         self.env.world.setGravity((0,0,-9.81))
-        self.env.enable_gravity(True)
+        #self.env.enable_gravity(True)
 
         '''
         for i in range(100000):
@@ -260,7 +285,7 @@ class MainReacher():
             self.env.step((np.zeros(3),np.zeros(3),np.zeros(3),torques))
         '''
         
-        for _ in range(1000000):
+        for i in range(1000000):
             dt = self.env.dt
             arrxy, arrxz = self.env.render('rgb-array')
             detectedJointAngles = self.env.ground_truth_joint_angles
@@ -285,7 +310,7 @@ class MainReacher():
             
             grav_opposite_torques = self.grav(detectedJointAngles)
 
-            torques = J.T*ee_desired_force + grav_opposite_torques
+            torques = J.T*ee_desired_force - grav_opposite_torques
 
             ### Uncomment to compare the FK outputs ###
             # eePos = self.detect_ee(rgb_array)
@@ -295,7 +320,7 @@ class MainReacher():
             # print "FK Analytic: " + str(eeFKAnalytic)
             # print "FK: " + str(eeFK) 
             self.env.step((np.zeros(3),np.zeros(3), np.zeros(3), torques))
-            #self.env.step((np.zeros(3),np.zeros(3), [0,0,0,math.pi/2], np.zeros(3)))
+                
             
 def main():
     reach = MainReacher()
