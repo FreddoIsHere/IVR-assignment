@@ -255,7 +255,7 @@ class MainReacher():
 
         x, y, z, k = self.env.ground_truth_joint_angles
 
-        return np.array([ja1, ja2, ja3, k])
+        return np.array([ja1, ja2, ja3, ja4])
 
 
     def get_target_coords(self, xyarray, xzarray):
@@ -399,7 +399,6 @@ class MainReacher():
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
-        target = [0, 0, 0]
 
         for i in range(100000):
             dt = self.env.dt
