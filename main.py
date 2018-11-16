@@ -42,10 +42,6 @@ class MainReacher():
             prev = [cx,cy]
             cx = loc[0]+lower_x+26
             cy = loc[1]+lower_y+26
-            if self.prnt:
-                print("Redxy: %s, expected: %s"%([cx,cy],prev))
-            else:
-                print("Redxz: %s, expected: %s"%([cx,cy],prev))
         else:
             print("Got zero division error for red")
             return None
@@ -76,10 +72,6 @@ class MainReacher():
             prev = [cx,cy]
             cx = loc[0]+lower_x+23
             cy = loc[1]+lower_y+23
-            if self.prnt:
-                print("Greenxy: %s, expected: %s"%([cx,cy],prev))
-            else:
-                print("Greenxz: %s, expected: %s"%([cx,cy],prev))
         else:
             print("Got zero division error for green")
             return None
@@ -108,11 +100,6 @@ class MainReacher():
             prev = [cx,cy]
             cx = loc[0]+lower_x+19
             cy = loc[1]+lower_y+19
-            if self.prnt:
-                print("Bluexy: %s, expected: %s"%([cx,cy],prev))
-            else:
-                print("Bluexz: %s, expected: %s"%([cx,cy],prev))
-                self.pos_bluexz = [cx,cy]
         else:
             print("Got zero division error for blue")
             return None
@@ -142,7 +129,6 @@ class MainReacher():
             cx = loc[0]+lower_x+14
             cy = loc[1]+lower_y+14
             print("Endxz: %s, expected: %s"%([cx,cy],prev))
-            print("Difference between end and blue: (%.2f,%.2f)"%(cx-self.pos_bluexz[0],cy-self.pos_bluexz[1]))
             #cv2.imshow("End",mask)
             #cv2.waitKey(0)
         else:
@@ -256,8 +242,6 @@ class MainReacher():
         endxz = self.detect_end(xzarray, lumi2)
         greenxz = self.detect_green(xzarray)
 
-        estimated = False
-
         if redxy is not None:
             redxy[1] = 0 # Know y coord should always be 0 as can't move in xy plane
             ja1_other = math.atan2(redxy[1],redxy[0])
@@ -266,10 +250,9 @@ class MainReacher():
             self.prev_ja1_other = ja1_other
         else:
             print("Estimated ja1_other")
-            estimated = True
             ja1_other = self.angle_normalize(self.prev_ja1_other+self.prev_ja1_other_vel*self.env.dt)
 
-        if type(greenxy) == np.ndarray and type(redxy) == np.ndarray and not estimated:
+        if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
             ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
             print("Raw ja2: %s"%ja2)
             if greenxy[0]<0 and redxy[0]<0:
@@ -278,11 +261,10 @@ class MainReacher():
             ja2 = self.angle_normalize(ja2)
         else:
             print("Estimated ja2")
-            estimated = True
             ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
 
 
-        if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray and not estimated:
+        if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
             ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
             if bluexy[0]<0 and greenxy[0]<0 and redxy[0]<0:
                 ja3 = ja3*-1
@@ -292,19 +274,15 @@ class MainReacher():
 
         else:
             print("Estimated ja3")
-            estimated = True
             ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
-
-        estimated = False
 
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
         else:
             print("Estimated ja1")
-            estimated = True
             ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
-        if type(endxz) == np.ndarray and type(bluexz) == np.ndarray and not estimated:
+        if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
             print("Ja1=%s"%ja1)
             print("Ja4 before Ja1=%s"%math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0]))
             ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])
@@ -435,8 +413,8 @@ class MainReacher():
         #VEL : A joint space velocity control, the inputs require the joint angle error and joint velocities : env.step((joint angle error (velocity), estimated joint velocities, np.zeros(3), np.zeros(3)))
         #TORQUE : Provides direct access to the torque control on the robot : env.step((np.zeros(3),np.zeros(3),np.zeros(3),desired joint torques))
 
-        #self.env.controlMode="POS-IMG"
-        self.env.controlMode="VEL"
+        self.env.controlMode="POS-IMG"
+        #self.env.controlMode="VEL"
 
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
@@ -496,7 +474,7 @@ class MainReacher():
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
                 #detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
-                detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
+                #detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
                 x, y, z = self.get_target_coords(arrxy, arrxz)
                 print("Difference of target from true position: (%s,%s,%s)"%(x-self.env.ground_truth_valid_target[0],y-self.env.ground_truth_valid_target[1],z-self.env.ground_truth_valid_target[2]))
@@ -522,15 +500,15 @@ class MainReacher():
             #    cv2.waitKey(0)
             #    start = True
             print(i)
-            #if i>25:
-            #    time.sleep(1)
-            desired_joint_angles = np.array([ 0.84223373,  2.3601016,  -2.07817605,  1.47540308])
+            if i>160:
+                time.sleep(1)
+            desired_joint_angles = np.array([ math.pi,math.pi/2,0,0])
             # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
             #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
 
-            #self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
-            self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
+            self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
+            #self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
 
 
             #The step method will send the control input to the robot, the parameters are as follows: (Current Joint Angles/Error, Current Joint Velocities, Desired Joint Angles, Torque input)
