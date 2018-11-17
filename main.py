@@ -11,14 +11,9 @@ class MainReacher():
     def __init__(self):
         self.env = gym.make('3DReacherMy-v0')
         self.env.reset()
-
-    def get_illumination(self, image):
-        img = cv2.cvtColor(image, cv2.COLOR_RGB2Lab)
-        return (np.mean(img[:,:,0])/255)
-
+        
     def detect_red(self, image): # xz-image
         mask = cv2.inRange(image, (20, 0, 0),(255, 0, 0))
-        kernel = np.ones((5,5),np.uint8)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -48,7 +43,6 @@ class MainReacher():
 
     def detect_green(self, image):
         mask = cv2.inRange(image, (0, 20, 0),(0, 255, 0))
-        kernel = np.ones((5,5),np.uint8)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -76,7 +70,6 @@ class MainReacher():
 
     def detect_blue(self, image, lumi):
         mask = cv2.inRange(image, (0,0,200*lumi),(0,0,255))
-        kernel = np.ones((5,5),np.uint8)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -102,7 +95,6 @@ class MainReacher():
 
     def detect_end(self, image, lumi):
         mask = cv2.inRange(image, (0,0,5),(0,0,140*lumi))
-        kernel = np.ones((5,5),np.uint8)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -156,74 +148,11 @@ class MainReacher():
         self.prev_target = target
 
         return target
-
-    def detect_target2(self, image, lumi):
-        a = 140 *lumi
-        b = 190 *lumi
-        mask = cv2.inRange(image, (a,a,a),(b,b,b))
-        #kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=6)
-        #mask= cv2.erode(mask,kernel,iterations=5)
-        #dst =cv2.cornerHarris(mask,2,3,0.001)
-        #mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
-        #mask[dst>0.01*dst.max()]=[0,0,255]
-        #mask = cv2.inRange(mask, (0, 0, 0),(0, 0, 255))
-
-        mask = 255 - cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
-        params = cv2.SimpleBlobDetector_Params()
-        # Change thresholds
-        params.minThreshold = 10;
-        params.maxThreshold = 200;
-
-        # Filter by Area.
-        params.filterByArea = True
-        params.minArea = 0.1
-        params.maxArea = 1000
-
-        # Filter by Circularity
-        params.filterByCircularity = True
-        params.minCircularity = 0.1
-
-        params.maxCircularity = 0.6
-
-        # Filter by Convexity
-        params.filterByConvexity = True
-        params.minConvexity = 0.2
-
-        # Filter by Inertia
-        params.filterByInertia = True
-        params.minInertiaRatio = 0.01
-
-        detector = cv2.SimpleBlobDetector_create(params)
-        keypoints = detector.detect(mask)
-        print(self.average_keypoint(keypoints))
-        print(self.env.ground_truth_valid_target)
-        #im_with_keypoints = cv2.drawKeypoints(mask, keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        return self.average_keypoint(keypoints)
-
-    def average_keypoint(self, keypoints):
-        x = 0
-        y = 0
-        for k in keypoints:
-            x += k.pt[0]
-            y += k.pt[1]
-        l = len(keypoints)
-        return self.coordinate_convert([x/l, y/l])
-
-
-    def coordinate_convert(self,pixels):
-        #Converts pixels into metres
-        return np.array([(pixels[0]-self.env.viewerSize/2)/self.env.resolution,-(pixels[1]-self.env.viewerSize/2)/self.env.resolution])
-
-    def get_target_coords(self, xyarray, xzarray):
-        lumi1 = self.get_illumination(xyarray)
-        lumi2 = self.get_illumination(xzarray)
-        xy = self.detect_target(xyarray, lumi1)
-        xz = self.detect_target(xzarray, lumi2)
-        avgx = (xy[0] + xz[0])/2
-
-        return [avgx, xy[1], xz[1]]
-
+        
+    def get_illumination(self, image):
+        img = cv2.cvtColor(image, cv2.COLOR_RGB2Lab)
+        return (np.mean(img[:,:,0])/255)
+    
     def detect_joint_angles(self, xyarray, xzarray, prev_JAs, prev_jvs):
         lumi1 = self.get_illumination(xyarray)
         lumi2 = self.get_illumination(xzarray)
@@ -295,11 +224,24 @@ class MainReacher():
         #print(str([ja1, ja2, ja3, ja4]))
 
         return np.array([ja1, ja2, ja3, ja4])
+    
+    def coordinate_convert(self,pixels):
+        #Converts pixels into metres
+        return np.array([(pixels[0]-self.env.viewerSize/2)/self.env.resolution,-(pixels[1]-self.env.viewerSize/2)/self.env.resolution])
+    
+    def get_target_coords(self, xyarray, xzarray):
+        lumi1 = self.get_illumination(xyarray)
+        lumi2 = self.get_illumination(xzarray)
+        xy = self.detect_target(xyarray, lumi1)
+        xz = self.detect_target(xzarray, lumi2)
+        avgx = (xy[0] + xz[0])/2
 
+        return [avgx, xy[1], xz[1]]
+    
     def angle_normalize(self,x):
         #Normalizes the angle between pi and -pi
         return (((x+np.pi) % (2*np.pi)) - np.pi)
-
+    
     #new functions
     def link_transform_z(self,angle):
         #Calculate the Homogenoeous transformation matrix from rotation and translation
@@ -307,101 +249,217 @@ class MainReacher():
         trans = np.matrix(np.eye(4, 4))
         trans[0, 3] = 1
         return rot*trans
-
+    
     def rot_z(self, angle):
         rot = np.matrix([[np.cos(angle), -np.sin(angle), 0, 0],
                         [np.sin(angle), np.cos(angle), 0, 0],
                         [0, 0, 1, 0],
                         [0, 0, 0, 1]])
         return rot
-
+    
     def link_transform_y(self,angle):
         #Calculate the Homogenoeous transformation matrix from rotation and translation
         rot = self.rot_y(angle)
         trans = np.matrix(np.eye(4, 4))
         trans[0, 3] = 1
         return rot*trans
-
+    
     def rot_y(self, angle):
         rot = np.matrix([[np.cos(angle), 0, -np.sin(angle), 0],
                         [0, 1, 0, 0],
                         [np.sin(angle), 0, np.cos(angle), 0],
                         [0, 0, 0, 1]])
         return rot
-
-
+        
+    
     def Jacobian(self,joint_angles):
         jacobian = np.zeros((6,4))
-
+        
         j1_trans = self.link_transform_y(joint_angles[0])
         j2_trans = self.link_transform_z(joint_angles[1])
         j3_trans = self.link_transform_z(joint_angles[2])
         j4_trans = self.link_transform_y(joint_angles[3])
-
+        
         ee_pos = (j1_trans*j2_trans*j3_trans*j4_trans)[0:3, 3]
         j4_pos = (j1_trans*j2_trans*j3_trans)[0:3, 3]
         j3_pos = (j1_trans*j2_trans)[0:3, 3]
         j2_pos = (j1_trans)[0:3, 3]
         j1_pos = np.zeros((3,1))
-
+        
         pos3D = np.zeros(3)
-
+        
         pos3D = (ee_pos-j1_pos).T
         z0_vector = [0, -1, 0]
         jacobian[0:3, 0] = np.cross(z0_vector, pos3D)
         pos3D[0:3] = (ee_pos-j2_pos).T
-
+    
         #z1_vector = (j1_trans*np.array([0, 0, 1, 0]).reshape(4,1))[0:3].T
         z1_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
-
+        
         jacobian[0:3, 1] = np.cross(z1_vector, pos3D)
         pos3D[0:3] = (ee_pos-j3_pos).T
-
+        
         z2_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
-
+        
         jacobian[0:3, 2] = np.cross(z2_vector, pos3D)
         pos3D[0:3] = (ee_pos-j4_pos).T
-
+        
         z3_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*self.rot_z(joint_angles[2])[0:3, 0:3]*np.array([0, -1, 0]).reshape(3,1))[0:3].T
-
+        
         jacobian[0:3, 3] = np.cross(z3_vector, pos3D)
-
+        
         jacobian[3:6, 0] = z0_vector
         jacobian[3:6, 1] = z1_vector
         jacobian[3:6, 2] = z2_vector
         jacobian[3:6, 3] = z3_vector
-
-
+        
+        
         return jacobian
-
+    
     def IK(self, current_joint_angles, desired_position):
-
+        
         curr_pos = self.FK(current_joint_angles)[0:3,3]
         pos_error = desired_position - np.squeeze(np.array(curr_pos.T))
-
+        
         Jac = np.matrix(self.Jacobian(current_joint_angles))[0:3, :]
-
+        
         if (np.linalg.matrix_rank(Jac,0.4)<3):
             Jac_inv = Jac.T
             #Jac_inv = np.linalg.pinv(Jac, rcond=0.99999)
         else:
             Jac_inv = Jac.T*np.linalg.inv(Jac*Jac.T)
-
+        
         q_dot = Jac_inv*np.matrix(pos_error).T
-
+        
         return np.squeeze(np.array(q_dot.T))
-
+    
     def FK(self,j):
         j1_trans = self.link_transform_y(j[0])
         j2_trans = self.link_transform_z(j[1])
         j3_trans = self.link_transform_z(j[2])
         j4_trans = self.link_transform_y(j[3])
-
+        
         total_transform = j1_trans*j2_trans*j3_trans*j4_trans
         #print(np.cos(j[0])+np.cos(j[1])*np.cos(j[0])+np.cos(j[2]+j[1])*np.cos(j[0])+np.cos(j[0])*np.cos(j[2]+j[1])*np.cos(j[3]))
-
+        
         return total_transform
+    '''
+    def js_pd_control(self,  c_jas, c_jvs, d_jas):
+        
+        P = np.array([200,200,200,200])
+        
+        D = np.array([75,55,35, 20])
+        
+        P_error = np.matrix(d_jas-c_jas).T
+        
+        D_error = np.matrix(np.zeros(4)-c_jvs).T
+        
+        PD_error = np.diag(P)* P_error + np.diag(D)* D_error
+        
+        return PD_error
+    '''
+        
+    def ts_pd_control(self, c_ee_pos , c_ee_vel , d_ee_pos):
+        
+        P = np.array([210,210, 210])#default: 60, worked well: 200
+        D = np.array([50,50, 50])#default: 20, worked well: 60
+        P_error = np.matrix(d_ee_pos -c_ee_pos).T
+        D_error = np.zeros(shape=(3,1)) - np.matrix(c_ee_vel).T
+        
+        PD_error = np.diag(P)*P_error + np.diag(D)*D_error
+        
+        return PD_error
+    
+    def grav(self, joint_angles):
+        # Gravitational acceleration and mass
+        g = 9.81
+        m = 1
+        
+        j1_trans = self.link_transform_y(joint_angles[0])
+        j2_trans = self.link_transform_z(joint_angles[1])
+        j3_trans = self.link_transform_z(joint_angles[2])
+        j4_trans = self.link_transform_y(joint_angles[3])
+        
+        ee_pos = (j1_trans*j2_trans*j3_trans*j4_trans)[0:3, 3]
+        j4_pos = (j1_trans*j2_trans*j3_trans)[0:3, 3]
+        j3_pos = (j1_trans*j2_trans)[0:3, 3]
+        j2_pos = (j1_trans)[0:3, 3]
+        j1_pos = np.zeros((3,1))
+        
+        p14 = ((ee_pos - j4_pos)/2 + j4_pos).flatten()
+        p13 = ((j4_pos - j3_pos)/2 + j3_pos).flatten()
+        p12 = ((j3_pos - j2_pos)/2 + j2_pos).flatten()
+        p11 = ((j2_pos - j1_pos)/2 + j1_pos).flatten()
+        
+        p24 = ((ee_pos - j4_pos)/2 + j4_pos -j2_pos).flatten()
+        p23 = ((j4_pos - j3_pos)/2 + j3_pos -j2_pos).flatten()
+        p22 = ((j3_pos - j2_pos)/2 + j2_pos -j2_pos).flatten()
+        
+        p34 = ((ee_pos - j4_pos)/2 + j4_pos - j3_pos).flatten()
+        p33 = ((j4_pos - j3_pos)/2 + j3_pos - j3_pos).flatten()
+        
+        p44 = ((ee_pos - j4_pos)/2).flatten()
+    
 
+        grav = np.array([0, 0, -m*g])
+        
+        
+        '''
+        print('link-centres:')
+        print('for j1:')
+        print(p11, p12, p13, p14)
+        print('for j2:')
+        print(p22, p23, p24)
+        print('for j3:')
+        print(p34, p33)
+        print('for j4:')
+        print(p44)
+        '''
+        
+        z0 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * np.array([0, -1, 0]).reshape(3,1)).flatten())[0]
+    
+        z1 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * np.array([0, 0, 1]).reshape(3,1)).flatten())[0]
+       
+        z2 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * self.rot_z(joint_angles[2])[0:3, 0:3] * np.array([0, 0, 1]).reshape(3,1)).flatten())[0]
+        
+        z3 = np.array((self.rot_y(joint_angles[0])[0:3, 0:3] * self.rot_z(joint_angles[1])[0:3, 0:3] * self.rot_z(joint_angles[2])[0:3, 0:3] * self.rot_y(joint_angles[3])[0:3, 0:3] * np.array([0, -1, 0]).reshape(3, 1)).flatten())[0]
+               
+        
+        t4 = np.dot(z3, np.cross(p44, grav)[0, 0:3])
+    
+        t3 = np.dot(z2, np.cross(p33, grav)[0, 0:3]) + np.dot(z2, np.cross(p34, grav)[0, 0:3])
+        
+        t2 = np.dot(z1, np.cross(p22, grav)[0, 0:3]) + np.dot(z1, np.cross(p23, grav)[0, 0:3]) + np.dot(z1, np.cross(p24, grav)[0, 0:3])
+
+        t1 = np.dot(z0, np.cross(p11, grav)[0, 0:3]) + np.dot(z0, np.cross(p12, grav)[0, 0:3]) + np.dot(z0, np.cross(p13, grav)[0, 0:3]) + np.dot(z0, np.cross(p14, grav)[0, 0:3])
+        
+        
+        '''
+        t1 = np.array(-grav *p14 - grav*p13 - grav*p12 - grav*p11)[0][0]
+        
+        t2 = np.array(-grav *p24 - grav*p23 - grav*p22)[0][0]
+        
+        t3 = np.array(-grav *p34 - grav*p33)[0][0]
+        
+        t4 = np.array(- grav*p44)[0][0]
+        '''
+    
+        '''
+        print('4th-t:', t4)
+        print('z3:', z3)
+        print('p44', p44)
+        print('3th-t:', t3)
+        print('z2:', z2)
+        print('p33, p34', p33, p34)
+        print('2th-t:', t2)
+        print('z1:', z1)
+        print('p22, p23, p24', p22, p23, p24)
+        print('1th-t:', t1)
+        print('z0:', z0)
+        print('p11, p12, p13, p14', p11, p12, p13, p14)
+        '''
+        
+        return np.matrix([t1, t2, t3, t4]).T
 
     def go(self):
         #The robot has several simulated modes:
@@ -412,18 +470,11 @@ class MainReacher():
         #POS-IMG : Same control as POS, however you must provide the current joint angles and velocities : env.step((estimated joint angles, estimated joint velocities, desired joint angles, np.zeros(3)))
         #VEL : A joint space velocity control, the inputs require the joint angle error and joint velocities : env.step((joint angle error (velocity), estimated joint velocities, np.zeros(3), np.zeros(3)))
         #TORQUE : Provides direct access to the torque control on the robot : env.step((np.zeros(3),np.zeros(3),np.zeros(3),desired joint torques))
-
-        #self.env.controlMode="POS-IMG"
-        self.env.controlMode="VEL"
-
+        self.env.controlMode="TORQUE"
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
         prev_jvs = np.zeros(4)
-
-
-        # Uncomment to have gravity act in the z-axis
-        # self.env.world.setGravity((0,0,-9.81))
-
+        
         self.red_temp = np.zeros((52,52))
         self.red_temp = cv2.circle(self.red_temp,(26,26),25,1,-1).astype(np.uint8)
         self.green_temp = np.zeros((46,46))
@@ -432,50 +483,79 @@ class MainReacher():
         self.blue_temp = cv2.circle(self.blue_temp,(19,19),18,1,-1).astype(np.uint8)
         self.end_temp = np.zeros((28,28))
         self.end_temp = cv2.circle(self.end_temp,(14,14),13,1,-1).astype(np.uint8)
+        
+        prevEePos = np.zeros(shape=(1,3))
+        
+        #prevJointAngles = np.zeros(4)
+    
 
-        self.prev_ja1_other = None
-        self.prev_ja2_other = None
-        self.prev_ja3_other = None
+        # Uncomment to have gravity act in the z-axis
+        self.env.world.setGravity((0,0,-9.81))
+        #self.env.enable_gravity(True)
 
-        self.prev_target=(0,0,0)
-        x,y,z=(0,0,0)
-
+        '''
         for i in range(100000):
-            #The change in time between iterations can be found in the self.env.dt variable
             dt = self.env.dt
-            #self.env.render returns 2 RGB arrays of the robot, one for the xy-plane, and one for the xz-plane
-            arrxy,arrxz = self.env.render('rgb-array')
+            arrxy,arrxz = self.env.render('rgb-array')     
+         
+            detectedJointAngles = self.env.ground_truth_joint_angles
+            x, y, z = self.env.ground_truth_valid_target
 
+            desired_jointAngles = self.IK(detectedJointAngles,[x, y, -z])+ detectedJointAngles
+            
+            detectedJointVels = self.angle_normalize(detectedJointAngles-prevJointAngles)/dt
+            
+            prevJointAngles = detectedJointAngles
+            
+            torques = self.js_pd_control(detectedJointAngles, detectedJointVels, desired_jointAngles)
+            
+            self.env.step((np.zeros(3),np.zeros(3),np.zeros(3),torques))
+        '''
+        self.prev_target=(0,0,0)
+        
+        for i in range(1000000):
+            dt = self.env.dt
+            arrxy, arrxz = self.env.render('rgb-array')
+            
+        
             if i == 0:
                 detectedJointAngles = np.zeros(4)
                 detectedJointVels = np.zeros(4)
+                ee_target = [0, 0, 0]
             else:
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
-                x, y, z = self.get_target_coords(arrxy, arrxz)
-                print("Difference of target from true position: (%s,%s,%s)"%(x-self.env.ground_truth_valid_target[0],y-self.env.ground_truth_valid_target[1],z-self.env.ground_truth_valid_target[2]))
-
-            jointAngles = self.IK(detectedJointAngles,[x, y, z])
-
-            print(i)
-            print("Actual angles: %s" % self.env.ground_truth_joint_angles)
-            print("Predicted angles %s" % detectedJointAngles)
-            print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
-            print("Predicted velocity: %s" % detectedJointVels)
-            print("------------------------------")
-
-            desired_joint_angles = np.array([ math.pi/2,0,0,0])
-
-            #self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
-            self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
-
-
-            #The step method will send the control input to the robot, the parameters are as follows: (Current Joint Angles/Error, Current Joint Velocities, Desired Joint Angles, Torque input)
-
-            prev_JAs = detectedJointAngles
+                ee_target = self.get_target_coords(arrxy, arrxz)
+            
             prev_jvs = detectedJointVels
+            prev_JAs = detectedJointAngles
+            
 
-#main method
+            ee_pos = np.array(self.FK(detectedJointAngles)[0:3, 3]).flatten()
+            
+            ee_vel = (ee_pos - prevEePos)/dt
+
+            prevEePos = ee_pos
+
+            J = self.Jacobian(detectedJointAngles)[0:3,:]
+            
+
+            ee_desired_force = self.ts_pd_control(ee_pos, ee_vel, ee_target)
+            
+            grav_opposite_torques = self.grav(detectedJointAngles)
+
+            torques = J.T*ee_desired_force - grav_opposite_torques
+
+            ### Uncomment to compare the FK outputs ###
+            # eePos = self.detect_ee(rgb_array)
+            # eeFKAnalytic = self.FK_analytic(detectedJointAngles)
+            # eeFK = self.FK(detectedJointAngles)
+            # print "End effector position: " + str(eePos)
+            # print "FK Analytic: " + str(eeFKAnalytic)
+            # print "FK: " + str(eeFK) 
+            self.env.step((np.zeros(3),np.zeros(3), np.zeros(3), torques))
+                
+            
 def main():
     reach = MainReacher()
     reach.go()
