@@ -19,8 +19,6 @@ class MainReacher():
     def detect_red(self, image): # xz-image
         mask = cv2.inRange(image, (20, 0, 0),(255, 0, 0))
         kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=2)
-        #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -51,8 +49,6 @@ class MainReacher():
     def detect_green(self, image):
         mask = cv2.inRange(image, (0, 20, 0),(0, 255, 0))
         kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=2)
-        #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -81,8 +77,6 @@ class MainReacher():
     def detect_blue(self, image, lumi):
         mask = cv2.inRange(image, (0,0,200*lumi),(0,0,255))
         kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=2)
-        #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -109,8 +103,6 @@ class MainReacher():
     def detect_end(self, image, lumi):
         mask = cv2.inRange(image, (0,0,5),(0,0,140*lumi))
         kernel = np.ones((5,5),np.uint8)
-        #mask = cv2.dilate(mask,kernel,iterations=2)
-        #mask=cv2.erode(mask,kernel,iterations=3)
 
         M = cv2.moments(mask)
         if M['m00'] != 0:
@@ -128,9 +120,6 @@ class MainReacher():
             prev = [cx,cy]
             cx = loc[0]+lower_x+14
             cy = loc[1]+lower_y+14
-            print("Endxz: %s, expected: %s"%([cx,cy],prev))
-            #cv2.imshow("End",mask)
-            #cv2.waitKey(0)
         else:
             print("Got zero division error for end")
             return None
@@ -144,20 +133,29 @@ class MainReacher():
         im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         image = image.copy()
 
-        dc = cv2.convexHull(contours[0])
-        areadiff1 = cv2.contourArea(contours[0]) - cv2.contourArea(dc)
-        dc2 = cv2.convexHull(contours[1])
-        areadiff2 = cv2.contourArea(contours[1]) - cv2.contourArea(dc2)
+        if (len(contours)==2):
+            dc = cv2.convexHull(contours[0])
+            areadiff1 = cv2.contourArea(contours[0]) - cv2.contourArea(dc)
+            dc2 = cv2.convexHull(contours[1])
+            areadiff2 = cv2.contourArea(contours[1]) - cv2.contourArea(dc2)
+        else:
+            return self.prev_target
 
         if areadiff2 < areadiff1:
             M = cv2.moments(contours[1])
         else:
             M = cv2.moments(contours[0])
 
-        cx = int(M['m10']/M['m00'])
-        cy = int(M['m01']/M['m00'])
+        if (M['m00']!=0):
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+        else:
+            return self.prev_target
 
-        return self.coordinate_convert([cx, cy])
+        target = self.coordinate_convert([cx, cy])
+        self.prev_target = target
+
+        return target
 
     def detect_target2(self, image, lumi):
         a = 140 *lumi
@@ -243,39 +241,10 @@ class MainReacher():
         endxz = self.detect_end(xzarray, lumi2)
         greenxz = self.detect_green(xzarray)
 
-        if redxy is not None:
-            redxy[1] = 0 # Know y coord should always be 0 as can't move in xy plane
-            ja1_other = math.atan2(redxy[1],redxy[0])
-            if self.prev_ja1_other is not None:
-                self.prev_ja1_other_vel = self.angle_normalize(ja1_other-self.prev_ja1_other)/self.env.dt
-            self.prev_ja1_other = ja1_other
-        else:
-            print("Estimated ja1_other")
-            ja1_other = self.angle_normalize(self.prev_ja1_other+self.prev_ja1_other_vel*self.env.dt)
-
-        if type(greenxy) == np.ndarray and type(redxy) == np.ndarray:
-            ja2 = math.atan2(greenxy[1]-redxy[1],greenxy[0]-redxy[0])
-            print("Raw ja2: %s"%ja2)
-            if ja1_other != 0:
-                ja2 = ja2*-1
-            ja2 -= ja1_other
-            ja2 = self.angle_normalize(ja2)
-        else:
-            print("Estimated ja2")
-            ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
-
-
-        if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray:
-            ja3 = math.atan2(bluexy[1]-greenxy[1],bluexy[0]-greenxy[0])
-            if ja1_other != 0:
-                ja3 = ja3*-1
-            print("Raw ja3: %s"%ja3)
-            ja3 -= ja2 - ja1_other
-            ja3 = self.angle_normalize(ja3)
-
-        else:
-            print("Estimated ja3")
-            ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
+        D = np.array([[1,0,0,-1],
+                      [0,1,0,0],
+                      [0,0,1,0],
+                      [0,0,0,1]])
 
         if type(redxz) == np.ndarray:
             ja1 = math.atan2(redxz[1],redxz[0])
@@ -283,30 +252,45 @@ class MainReacher():
             print("Estimated ja1")
             ja1 = self.angle_normalize(prev_JAs[0]+prev_jvs[0]*self.env.dt)
 
-        if type(endxz) == np.ndarray and type(bluexz) == np.ndarray:
-            print("Ja1=%s"%ja1)
-            print("Ja4 before Ja1=%s"%math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0]))
-            ja4 = math.atan2(endxz[1]-bluexz[1],endxz[0]-bluexz[0])
-            ja4 -= ja1
-            ja4 = self.angle_normalize(ja4)
+        if type(greenxy) == np.ndarray and type(redxy) == np.ndarray and type(greenxz) == np.ndarray and type(redxz) == np.ndarray:
+            v = np.matmul(D,self.rot_y(ja1).T)
+            v = np.matmul(v,np.array([greenxy[0]-redxy[0],
+                                      greenxy[1]-redxy[1],
+                                      greenxz[1]-redxz[1],
+                                      0]).reshape((4,1)))
+            ja2 = math.atan2(v[1],v[0])
+        else:
+            print("Estimated ja2")
+            ja2 = self.angle_normalize(prev_JAs[1]+prev_jvs[1]*self.env.dt)
+
+
+        if type(bluexy) == np.ndarray and type(greenxy) == np.ndarray and type(bluexz) == np.ndarray and type(greenxz) == np.ndarray:
+            v = np.matmul(D,self.rot_z(ja2).T)
+            v = np.matmul(v,D)
+            v = np.matmul(v,self.rot_y(ja1).T)
+            v = np.matmul(v,np.array([bluexy[0]-greenxy[0],
+                                      bluexy[1]-greenxy[1],
+                                      bluexz[1]-greenxz[1],
+                                      0]).reshape((4,1)))
+            ja3 = math.atan2(v[1],v[0])
+        else:
+            print("Estimated ja3")
+            ja3 = self.angle_normalize(prev_JAs[2]+prev_jvs[2]*self.env.dt)
+
+        if type(endxz) == np.ndarray and type(endxy) == np.ndarray and type(bluexz) == np.ndarray and type(bluexy) == np.ndarray:
+            v = np.matmul(D,self.rot_z(ja3).T)
+            v = np.matmul(v,D)
+            v = np.matmul(v,self.rot_z(ja2).T)
+            v = np.matmul(v,D)
+            v = np.matmul(v,self.rot_y(ja1).T)
+            v = np.matmul(v,np.array([endxz[0]-bluexz[0],
+                                      endxy[1]-bluexy[1],
+                                      endxz[1]-bluexz[1],
+                                      0]).reshape((4,1)))
+            ja4 = math.atan2(v[2],v[0])
         else:
             print("Estimated ja4")
             ja4 = self.angle_normalize(prev_JAs[3]+prev_jvs[3]*self.env.dt)
-
-        D = np.array([[1,0,0,-1],
-                      [0,1,0,0],
-                      [0,0,1,0],
-                      [0,0,0,1]])
-        v = np.matmul(D,self.rot_z(self.env.ground_truth_joint_angles[2]).T)
-        v = np.matmul(v,D)
-        v = np.matmul(v,self.rot_z(self.env.ground_truth_joint_angles[1]).T)
-        v = np.matmul(v,D)
-        v = np.matmul(v,self.rot_y(self.env.ground_truth_joint_angles[0]).T)
-        v = np.matmul(v,np.array([endxz[0]-bluexz[0],
-                                  endxz[1]-bluexz[1],
-                                  endxy[1]-bluexy[1],
-                                  0]).reshape((4,1)))
-        ja4 = math.atan2(v[1],v[0])
 
         #print(str([ja1, ja2, ja3, ja4]))
 
@@ -453,6 +437,7 @@ class MainReacher():
         self.prev_ja2_other = None
         self.prev_ja3_other = None
 
+        self.prev_target=(0,0,0)
         x,y,z=(0,0,0)
 
         for i in range(100000):
@@ -461,67 +446,25 @@ class MainReacher():
             #self.env.render returns 2 RGB arrays of the robot, one for the xy-plane, and one for the xz-plane
             arrxy,arrxz = self.env.render('rgb-array')
 
-            #if i == 100:
-                #print(str(self.get_target_coords(arrxy, arrxz)))
-                #print(str(self.env.ground_truth_valid_target))
-                #print(self.get_illumination(arrxy))
-                #]self.detect_target2(arrxy, self.get_illumination(arrxy))
-                #cv2.imshow( "Display window", self.detect_target2(arrxy, self.get_illumination(arrxy)))
-                #cv2.waitKey(0)
-
-            #if i == 400:
-                #angles = self.detect_joint_angles(arrxy, arrxz)
-                #print(self.env.ground_truth_joint_angles)
-
-            #if i == 0:
-                #detectedJointAngles = self.env.ground_truth_joint_angles
-
-            #if i > 1:
-
-                #detectedJointAngles = self.detect_joint_angles(arrxy, arrxz)
-
-                #print("Actual target:"+str(self.env.ground_truth_valid_target))
-                #print("Predicted target:"+str(self.get_target_coords(arrxy, arrxz)))
-
             if i == 0:
                 detectedJointAngles = np.zeros(4)
                 detectedJointVels = np.zeros(4)
             else:
                 detectedJointAngles = self.detect_joint_angles(arrxy, arrxz, prev_JAs, prev_jvs)
-                #detectedJointAngles[1] = self.env.ground_truth_joint_angles[1]
-                #detectedJointAngles[2] = self.env.ground_truth_joint_angles[2]
-                #detectedJointAngles[3] = self.env.ground_truth_joint_angles[3]
                 detectedJointVels = self.angle_normalize(detectedJointAngles-prev_JAs)/dt
                 x, y, z = self.get_target_coords(arrxy, arrxz)
                 print("Difference of target from true position: (%s,%s,%s)"%(x-self.env.ground_truth_valid_target[0],y-self.env.ground_truth_valid_target[1],z-self.env.ground_truth_valid_target[2]))
 
-            #if i == 100:
-            #    cv2.imshow("xy",arrxy)
-            #    cv2.waitKey(0)
-
             jointAngles = self.IK(detectedJointAngles,[x, y, z])
 
+            print(i)
             print("Actual angles: %s" % self.env.ground_truth_joint_angles)
             print("Predicted angles %s" % detectedJointAngles)
             print("Actual velocity: %s" % self.env.ground_truth_joint_velocities)
             print("Predicted velocity: %s" % detectedJointVels)
-            #print("Difference in actual and pred vel: %s " % (detectedJointVels-self.env.ground_truth_joint_velocities))
-            #if self.green_mask is not None:
-                #cv2.imshow("Green mask",self.green_mask)
-                #cv2.imshow("Redxy",arrxy)
-                #cv2.waitKey(0)
             print("------------------------------")
-            #if (detectedJointAngles[1]<-0.719 or start):
-            #    cv2.imshow('Nothing',np.zeros(5))
-            #    cv2.waitKey(0)
-            #    start = True
-            print(i)
-            #if i>160:
-            #    time.sleep(1)
-            desired_joint_angles = np.array([ math.pi/2,math.pi/2+1,0,1])
-            # self.env.step((np.zeros(3),np.zeros(3),jointAngles, np.zeros(3)))
-            #self.env.step((np.zeros(3),np.zeros(3),np.zeros(3), np.zeros(4)))
-            #self.env.step((np.zeros(3),np.zeros(3), desired_joint_angles, np.zeros(3)))
+
+            desired_joint_angles = np.array([ math.pi/2,0,0,0])
 
             #self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
             self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
