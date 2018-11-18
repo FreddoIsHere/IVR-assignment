@@ -413,8 +413,8 @@ class MainReacher():
         #VEL : A joint space velocity control, the inputs require the joint angle error and joint velocities : env.step((joint angle error (velocity), estimated joint velocities, np.zeros(3), np.zeros(3)))
         #TORQUE : Provides direct access to the torque control on the robot : env.step((np.zeros(3),np.zeros(3),np.zeros(3),desired joint torques))
 
-        self.env.controlMode="POS-IMG"
-        #self.env.controlMode="VEL"
+        #self.env.controlMode="POS-IMG"
+        self.env.controlMode="VEL"
 
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
@@ -464,10 +464,10 @@ class MainReacher():
             print("Predicted velocity: %s" % detectedJointVels)
             print("------------------------------")
 
-            desired_joint_angles = np.array([ -math.pi/2,-math.pi/2,-math.pi/4,0])
+            desired_joint_angles = np.array([ math.pi/2,0,0,0])
 
-            self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
-            #self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
+            #self.env.step((detectedJointAngles, detectedJointVels, desired_joint_angles, np.zeros(4))) #POS-IMG
+            self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3))) #VEL
 
 
             #The step method will send the control input to the robot, the parameters are as follows: (Current Joint Angles/Error, Current Joint Velocities, Desired Joint Angles, Torque input)
