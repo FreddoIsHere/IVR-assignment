@@ -8,12 +8,16 @@ import math
 import cv2
 from pyquaternion import Quaternion as pyquat
 from reacher3D import rendering
+#------NEW CODE--------
+import random
+#------END CODE--------
 
 class ReacherEnv(gym.Env):
     metadata = {
         'render.modes' : ['human', 'rgb_array'],
         'video.frames_per_second' : 5
     }
+
     def create_link(self,body,pos):
         body.setPosition(pos)
         M = ode.Mass()
@@ -42,6 +46,23 @@ class ReacherEnv(gym.Env):
         self.rod_template_3 = self.rod_template_3.T
 
     def __init__(self):
+
+        #------NEW CODE--------
+        self.use_new_reacher = True
+        if self.use_new_reacher:
+            self.static = True
+            self.ob = []
+            self.ob_transform = []
+            self.ob_pos = []
+            self.ob_rad = []
+            self.ob_vel = []
+            self.noObjs = 5
+            self.obj_radius_max = 0.2
+            if self.static:
+                self.noObjs *= 2
+            self.ob_pos_range = 6
+        #------END NEW CODE--------
+
         self.dt=.005
         self.viewer = None
         self.viewerSize = 800
@@ -116,13 +137,14 @@ class ReacherEnv(gym.Env):
         self.P_gains = np.array([1000,1000,1000,1000])
         self.D_gains = np.array([70,50,40,20])
 
+
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
     def enable_gravity(self,on):
         if on:
-            self.world.setGravity((0,0,-9.81))
+            self.world.setGravity((0,-9.81,0))
         else:
             self.world.setGravity((0,0,0))
 
@@ -259,6 +281,20 @@ class ReacherEnv(gym.Env):
             self.viewer.perspective_transform_on=self.perspective_transform_on
             self.viewer.set_bounds(-self.spaceSize/2.0,self.spaceSize/2.0,-self.spaceSize/2.0,self.spaceSize/2.0)
 
+            if self.use_new_reacher:
+                if self.static:
+                    for i in range(0,self.noObjs):
+                        self.ob_rad.append(random.random()*self.obj_radius_max+0.05)
+                        self.ob.append(rendering.make_sphere(self.ob_rad[i]))
+                        self.ob[i].set_color(0, 0, 0)
+                        self.ob_transform.append(rendering.Transform())
+                        self.ob_pos.append(self.get_random_pos())
+                        self.ob_vel.append(self.get_random_vel())
+                        self.ob_transform[i].set_translation(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2])
+                        self.ob[i].add_attr(self.ob_transform[i])
+                        self.colours.append([0.0,0.0,0.0])
+                        self.viewer.add_geom(self.ob[i])
+
             rod1 = rendering.make_cuboid(1, .3)
             rod1.set_color(0.4, 0.4, 0.4)
             self.colours.append([0.4,0.4,0.4])
@@ -279,8 +315,12 @@ class ReacherEnv(gym.Env):
 
 
             rod3 = rendering.make_cuboid(1, .1)
-            rod3.set_color(0,0,0)
-            self.colours.append([0.0,0.0,0.0])
+            if self.use_new_reacher:
+                rod3.set_color(0.05,0.05,0.05)
+                self.colours.append([0.05,0.05,0.05])
+            else:
+                rod3.set_color(0,0,0)
+                self.colours.append([0.0,0.0,0.0])
             self.pole_transform3 = rendering.Transform()
             self.pole_transform31 = rendering.Transform()
             rod3.add_attr(self.pole_transform3)
@@ -294,7 +334,6 @@ class ReacherEnv(gym.Env):
             self.pole_transform51 = rendering.Transform()
             rod5.add_attr(self.pole_transform5)
             rod5.add_attr(self.pole_transform51)
-
 
             axle1 = rendering.make_sphere(0.25)
             axle1.set_color(1,0,0)
@@ -329,7 +368,7 @@ class ReacherEnv(gym.Env):
             axle5.add_attr(self.axle_transform5)
             self.axle_transform52 = rendering.Transform()
             axle5.add_attr(self.axle_transform52)
-            
+
             self.viewer.add_geom(rod1)
             self.viewer.add_geom(rod2)
             self.viewer.add_geom(rod3)
@@ -339,7 +378,6 @@ class ReacherEnv(gym.Env):
             self.viewer.add_geom(axle3)
 
             self.viewer.add_geom(axle5)
-
 
         self.target.set_color(0.7,0.7,0.7)
         self.invalid_target.set_color(0.7,0.7,0.7)
@@ -357,6 +395,44 @@ class ReacherEnv(gym.Env):
         self.ground_truth_valid_target = self.targetPos.T.flatten()
         self.ground_truth_invalid_target = self.invalpos.T.flatten()
         self.ground_truth_end_effector = self.body4.getPosition()
+
+
+        #------START NEW STUFF---------------------------------------
+        if self.use_new_reacher:
+            if len(self.ob) == 0:
+                for i in range(0,self.noObjs):
+                    self.ob_rad.append(random.random()*self.obj_radius_max+0.05)
+                    self.ob.append(rendering.make_sphere(self.ob_rad[i]))
+                    self.ob[i].set_color(0, 0, 0)
+                    self.ob_transform.append(rendering.Transform())
+                    self.ob_pos.append(self.get_random_pos())
+                    self.ob_vel.append(self.get_random_vel())
+                    self.ob_transform[i].set_translation(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2])
+                    self.ob[i].add_attr(self.ob_transform[i])
+                    if self.static:
+                        self.colours.append([0.0,0.0,0.0])
+                        self.viewer.add_geom(self.ob[i])
+            if not(self.static):
+                for i in range(0,self.noObjs):
+                    self.ob_pos[i] = self.ob_pos[i] + self.ob_vel[i]
+                    self.ob_transform[i].set_translation(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2])
+                    self.ob_vel[i] = self.get_new_vel(self.ob_vel[i],self.ob_pos[i])
+                    self.viewer.add_onetime(self.ob[i])
+            for i in range(0,len(self.ob_pos)):
+                ee_pos = np.array([self.ground_truth_end_effector[0],self.ground_truth_end_effector[1],self.ground_truth_end_effector[2]])
+                diffX = self.ob_pos[i] - ee_pos
+                dist = np.sqrt(diffX[0]**2+diffX[1]**2+diffX[2]**2)[0]
+                if dist <= self.ob_rad[i]+1:
+                    print("ADDED OBJECT INDICATOR AT (%s,%s,%s)"%(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2]))
+                    objectIndi = rendering.make_sphere(self.ob_rad[i]/2)
+                    objectIndi.set_color(255, 255, 255)
+                    objectIndiTrans = rendering.Transform()
+                    objectIndiTrans.set_translation(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2])
+                    objectIndi.add_attr(objectIndiTrans)
+                    self.viewer.add_onetime(objectIndi)
+
+
+        #------END NEW STUFF---------------------------------------
 
         if self.viewer.time==0:
             if np.random.rand()>0.5:
@@ -380,6 +456,35 @@ class ReacherEnv(gym.Env):
 
         return self.viewer.render(True)
 
+    #------START NEW STUFF---------------------------------------
+    def get_random_pos(self):
+        found_overlap = True
+        while found_overlap:
+            pos = (np.random.rand(3,1)-0.5)*self.ob_pos_range
+            found_overlap = False
+            for i in range(0,len(self.ob_pos)):
+                other_pos = self.ob_pos[i]
+                diffX = pos - other_pos
+                dist_xy = np.sqrt(diffX[0]**2+diffX[1]**2)[0]
+                dist_xz = np.sqrt(diffX[0]**2+diffX[2]**2)[0]
+                if dist_xy <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1 or dist_xz <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1:
+                    found_overlap = True
+                    break
+        return pos
+
+    def get_random_vel(self):
+        return (np.random.rand(3,1)-0.5)*0.05+0.01
+
+    def get_new_vel(self, vel, pos):
+        if abs(pos[0]) >= self.ob_pos_range/2.0:
+            vel[0] = vel[0] * -1
+        if abs(pos[1]) >= self.ob_pos_range/2.0:
+            vel[1] = vel[1] * -1
+        if abs(pos[2]) >= self.ob_pos_range/2.0:
+            vel[2] = vel[2] * -1
+        return vel
+
+    #------END NEW STUFF---------------------------------------
 
     def transform_link(self,body, t1, t2, j1, j2):
         x1,y1,z1 = body.getPosition()
