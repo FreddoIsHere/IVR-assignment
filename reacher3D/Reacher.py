@@ -57,9 +57,13 @@ class ReacherEnv(gym.Env):
             self.ob_rad = []
             self.ob_vel = []
             self.noObjs = 5
-            self.obj_radius_max = 0.2
+            self.obj_radius_max = 0.04
+            self.obj_radius_add = 0.13
             if self.static:
-                self.noObjs *= 2
+                self.noObjs *= 3
+                self.obj_radius_max = 0.1
+                self.obj_radius_add = 0.4
+                self.obj_boxes = [np.array([x+0.5,y+0.5,z+0.5]) for x in range(-3,3) for y in range(-3,3) for z in range(-3,3)]
             self.ob_pos_range = 6
         #------END NEW CODE--------
 
@@ -159,8 +163,22 @@ class ReacherEnv(gym.Env):
         return np.array(pos_gains*np.matrix(jas).T).flatten()-np.array((damp_gains*np.matrix(jvs).T).T).flatten()
 
     def rand_target(self):
-        pos = (np.random.rand(3,1)-0.5)*4
-        self.invalpos = (np.random.rand(3,1)-0.5)
+        if self.use_new_reacher:
+            if self.static:
+                pos = self.get_random_pos().reshape((3,1))
+                while abs(np.max(pos))>2:
+                    self.obj_boxes.append(pos.flatten())
+                    pos = self.get_random_pos().reshape((3,1))
+                self.invalpos = self.get_random_pos().reshape((3,1))
+                while abs(np.max(self.invalpos))>2:
+                    self.obj_boxes.append(self.invalpos.flatten())
+                    self.invalpos = self.get_random_pos().reshape((3,1))
+            else:
+                pos = (np.random.rand(3,1)-0.5)*4
+                self.invalpos = (np.random.rand(3,1)-0.5)
+        else:
+            pos = (np.random.rand(3,1)-0.5)*4
+            self.invalpos = (np.random.rand(3,1)-0.5)
         self.invalpos += np.sign(self.invalpos)* 0.2
         self.invalpos += pos
         self.targetGeom = ode.GeomSphere(self.space, radius=0.1)
@@ -229,6 +247,10 @@ class ReacherEnv(gym.Env):
         self.world.step(self.dt)
         self.space.collide(self.world,self.near_callback)
         if(self.targetTime>1 or self.targetTime2>1):
+            if self.use_new_reacher:
+                if self.static:
+                    self.obj_boxes.append(self.targetPos)
+                    self.obj_boxes.append(self.invalPos)
             self.targetPos=self.rand_target()
             if(self.targetTime>1):
                 self.success += 1
@@ -284,7 +306,7 @@ class ReacherEnv(gym.Env):
             if self.use_new_reacher:
                 if self.static:
                     for i in range(0,self.noObjs):
-                        self.ob_rad.append(random.random()*self.obj_radius_max+0.05)
+                        self.ob_rad.append(random.random()*self.obj_radius_max+self.obj_radius_add)
                         self.ob.append(rendering.make_sphere(self.ob_rad[i]))
                         self.ob[i].set_color(0, 0, 0)
                         self.ob_transform.append(rendering.Transform())
@@ -360,7 +382,6 @@ class ReacherEnv(gym.Env):
             self.axle_transform32 = rendering.Transform()
             axle3.add_attr(self.axle_transform32)
 
-
             axle5 = rendering.make_sphere(.13)
             axle5.set_color(0,0,0.5)
             self.colours.append([0.0,0.0,0.5])
@@ -401,7 +422,7 @@ class ReacherEnv(gym.Env):
         if self.use_new_reacher:
             if len(self.ob) == 0:
                 for i in range(0,self.noObjs):
-                    self.ob_rad.append(random.random()*self.obj_radius_max+0.05)
+                    self.ob_rad.append(random.random()*self.obj_radius_max+self.obj_radius_add)
                     self.ob.append(rendering.make_sphere(self.ob_rad[i]))
                     self.ob[i].set_color(0, 0, 0)
                     self.ob_transform.append(rendering.Transform())
@@ -421,10 +442,11 @@ class ReacherEnv(gym.Env):
             for i in range(0,len(self.ob_pos)):
                 ee_pos = np.array([self.ground_truth_end_effector[0],self.ground_truth_end_effector[1],self.ground_truth_end_effector[2]])
                 diffX = self.ob_pos[i] - ee_pos
-                dist = np.sqrt(diffX[0]**2+diffX[1]**2+diffX[2]**2)[0]
-                if dist <= self.ob_rad[i]+1:
-                    print("ADDED OBJECT INDICATOR AT (%s,%s,%s)"%(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2]))
-                    objectIndi = rendering.make_sphere(self.ob_rad[i]/2)
+                dist = np.sqrt(diffX[0]*diffX[0]+diffX[1]*diffX[1]+diffX[2]*diffX[2])
+                r = self.ob_rad[i]*1.5
+                if dist <= r:
+                    print("ADDED OBJECT INDICATOR AT (%s,%s,%s) with radius %s"%(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2],self.ob_rad[i]))
+                    objectIndi = rendering.make_sphere(np.min([self.ob_rad[i]/2,0.16]))
                     objectIndi.set_color(255, 255, 255)
                     objectIndiTrans = rendering.Transform()
                     objectIndiTrans.set_translation(self.ob_pos[i][0],self.ob_pos[i][1],self.ob_pos[i][2])
@@ -458,18 +480,23 @@ class ReacherEnv(gym.Env):
 
     #------START NEW STUFF---------------------------------------
     def get_random_pos(self):
-        found_overlap = True
-        while found_overlap:
-            pos = (np.random.rand(3,1)-0.5)*self.ob_pos_range
-            found_overlap = False
-            for i in range(0,len(self.ob_pos)):
-                other_pos = self.ob_pos[i]
-                diffX = pos - other_pos
-                dist_xy = np.sqrt(diffX[0]**2+diffX[1]**2)[0]
-                dist_xz = np.sqrt(diffX[0]**2+diffX[2]**2)[0]
-                if dist_xy <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1 or dist_xz <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1:
-                    found_overlap = True
-                    break
+        if self.static:
+            selected = random.randint(0,len(self.obj_boxes))
+            pos = self.obj_boxes[selected]
+            del self.obj_boxes[selected]
+        else:
+            found_overlap = True
+            while found_overlap:
+                pos = ((np.random.rand(3,)-0.5)*self.ob_pos_range)
+                found_overlap = False
+                for i in range(0,len(self.ob_pos)):
+                    other_pos = self.ob_pos[i]
+                    diffX = pos - other_pos
+                    dist_xy = np.sqrt(diffX[0]*diffX[0]+diffX[1]*diffX[1])
+                    dist_xz = np.sqrt(diffX[0]*diffX[0]+diffX[2]*diffX[2])
+                    if dist_xy <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1 or dist_xz <= self.ob_rad[i]*2+self.ob_rad[-1]*2+0.1:
+                        found_overlap = True
+                        break
         return pos
 
     def get_random_vel(self):
