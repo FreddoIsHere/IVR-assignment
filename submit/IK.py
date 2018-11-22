@@ -11,7 +11,7 @@ class MainReacher():
     def __init__(self):
         self.env = gym.make('3DReacherMy-v0')
         self.env.reset()
-        
+
     def detect_red(self, image): # xz-image
         mask = cv2.inRange(image, (3, 0, 0),(255, 0, 0))
 
@@ -138,7 +138,7 @@ class MainReacher():
         target = self.coordinate_convert([cx, cy])
 
         return target
-    
+
     def detect_joint_angles(self, xyarray, xzarray, prev_JAs, prev_jvs):
         lumi1 = self.get_illumination(xyarray)
         lumi2 = self.get_illumination(xzarray)
@@ -206,11 +206,11 @@ class MainReacher():
         #print(str([ja1, ja2, ja3, ja4]))
 
         return np.array([ja1, ja2, ja3, ja4])
-    
+
     def coordinate_convert(self,pixels):
         #Converts pixels into metres
         return np.array([(pixels[0]-self.env.viewerSize/2)/self.env.resolution,-(pixels[1]-self.env.viewerSize/2)/self.env.resolution])
-    
+
     def get_target_coords(self, xyarray, xzarray):
         lumi1 = self.get_illumination(xyarray)
         lumi2 = self.get_illumination(xzarray)
@@ -219,29 +219,29 @@ class MainReacher():
         avgx = (xy[0] + xz[0])/2
 
         return [avgx, xy[1], xz[1]]
-    
+
     def rot_z(self, angle):
         rot = np.matrix([[np.cos(angle), -np.sin(angle), 0, 0],
                         [np.sin(angle), np.cos(angle), 0, 0],
                         [0, 0, 1, 0],
                         [0, 0, 0, 1]])
         return rot
-        
+
     def get_illumination(self, image):
         img = cv2.cvtColor(image, cv2.COLOR_RGB2Lab)
         return (np.mean(img[:,:,0])/255)
-    
+
     def rot_y(self, angle):
         rot = np.matrix([[np.cos(angle), 0, -np.sin(angle), 0],
                         [0, 1, 0, 0],
                         [np.sin(angle), 0, np.cos(angle), 0],
                         [0, 0, 0, 1]])
         return rot
-    
+
     def angle_normalize(self,x):
         #Normalizes the angle between pi and -pi
         return (((x+np.pi) % (2*np.pi)) - np.pi)
-    
+
     #new functions
     def link_transform_z(self,angle):
         #Calculate the Homogenoeous transformation matrix from rotation and translation
@@ -249,87 +249,87 @@ class MainReacher():
         trans = np.matrix(np.eye(4, 4))
         trans[0, 3] = 1
         return rot*trans
-    
+
     def link_transform_y(self,angle):
         #Calculate the Homogenoeous transformation matrix from rotation and translation
         rot = self.rot_y(angle)
         trans = np.matrix(np.eye(4, 4))
         trans[0, 3] = 1
         return rot*trans
-        
-    
+
+
     def Jacobian(self,joint_angles):
         jacobian = np.zeros((6,4))
-        
+
         j1_trans = self.link_transform_y(joint_angles[0])
         j2_trans = self.link_transform_z(joint_angles[1])
         j3_trans = self.link_transform_z(joint_angles[2])
         j4_trans = self.link_transform_y(joint_angles[3])
-        
+
         ee_pos = (j1_trans*j2_trans*j3_trans*j4_trans)[0:3, 3]
         j4_pos = (j1_trans*j2_trans*j3_trans)[0:3, 3]
         j3_pos = (j1_trans*j2_trans)[0:3, 3]
         j2_pos = (j1_trans)[0:3, 3]
         j1_pos = np.zeros((3,1))
-        
+
         pos3D = np.zeros(3)
-        
+
         pos3D = (ee_pos-j1_pos).T
         z0_vector = [0, -1, 0]
         jacobian[0:3, 0] = np.cross(z0_vector, pos3D)
         pos3D[0:3] = (ee_pos-j2_pos).T
-    
+
         #z1_vector = (j1_trans*np.array([0, 0, 1, 0]).reshape(4,1))[0:3].T
         z1_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
-        
+
         jacobian[0:3, 1] = np.cross(z1_vector, pos3D)
         pos3D[0:3] = (ee_pos-j3_pos).T
-        
+
         z2_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*np.array([0, 0, 1]).reshape(3,1)).T
-        
+
         jacobian[0:3, 2] = np.cross(z2_vector, pos3D)
         pos3D[0:3] = (ee_pos-j4_pos).T
-        
+
         z3_vector = (self.rot_y(joint_angles[0])[0:3, 0:3]*self.rot_z(joint_angles[1])[0:3, 0:3]*self.rot_z(joint_angles[2])[0:3, 0:3]*np.array([0, -1, 0]).reshape(3,1))[0:3].T
-        
+
         jacobian[0:3, 3] = np.cross(z3_vector, pos3D)
-        
+
         jacobian[3:6, 0] = z0_vector
         jacobian[3:6, 1] = z1_vector
         jacobian[3:6, 2] = z2_vector
         jacobian[3:6, 3] = z3_vector
-        
-        
+
+
         return jacobian
-    
+
     def IK(self, current_joint_angles, desired_position):
-        
+
         curr_pos = self.FK(current_joint_angles)[0:3,3]
         pos_error = desired_position - np.squeeze(np.array(curr_pos.T))
-        
+
         Jac = np.matrix(self.Jacobian(current_joint_angles))[0:3, :]
-        
+
         if (np.linalg.matrix_rank(Jac,0.4)<3):
             Jac_inv = Jac.T
             #Jac_inv = np.linalg.pinv(Jac, rcond=0.99999)
         else:
             Jac_inv = Jac.T*np.linalg.inv(Jac*Jac.T)
-        
+
         q_dot = Jac_inv*np.matrix(pos_error).T
-        
+
         return np.squeeze(np.array(q_dot.T))
-    
+
     def FK(self,j):
         j1_trans = self.link_transform_y(j[0])
         j2_trans = self.link_transform_z(j[1])
         j3_trans = self.link_transform_z(j[2])
         j4_trans = self.link_transform_y(j[3])
-        
+
         total_transform = j1_trans*j2_trans*j3_trans*j4_trans
         #print(np.cos(j[0])+np.cos(j[1])*np.cos(j[0])+np.cos(j[2]+j[1])*np.cos(j[0])+np.cos(j[0])*np.cos(j[2]+j[1])*np.cos(j[3]))
-        
+
         return total_transform
-        
+
 
     def go(self):
         #The robot has several simulated modes:
@@ -344,7 +344,7 @@ class MainReacher():
         #Run 100000 iterations
         prev_JAs = np.zeros(4)
         prev_jvs = np.zeros(4)
-        
+
         self.red_temp = np.zeros((52,52))
         self.red_temp = cv2.circle(self.red_temp,(26,26),25,1,-1).astype(np.uint8)
         self.green_temp = np.zeros((46,46))
@@ -353,13 +353,13 @@ class MainReacher():
         self.blue_temp = cv2.circle(self.blue_temp,(19,19),18,1,-1).astype(np.uint8)
         self.end_temp = np.zeros((28,28))
         self.end_temp = cv2.circle(self.end_temp,(14,14),13,1,-1).astype(np.uint8)
-        
+
         self.prev_target = np.array([0, 0, 0])
-    
+
 
         # Uncomment to have gravity act in the z-axis
         # self.env.world.setGravity((0,0,-9.81))
-        startingTime = time.time() 
+        startingTime = time.time()
         anglediff1 = []
         anglediff2 = []
         anglediff3 = []
@@ -368,14 +368,17 @@ class MainReacher():
         veldiff2 = []
         veldiff3 = []
         veldiff4 = []
-        
+
         #anti-stuck system
         randomMov = 0
 
+        reached = 0
         for i in range(100000):
             dt = self.env.dt
-            arrxy,arrxz = self.env.render('rgb-array')     
+            arrxy,arrxz = self.env.render('rgb-array')
             if i == 0:
+                print("------------------------------")
+                print("Distance at start: ", math.sqrt((np.array(self.env.ground_truth_valid_target)[0]-np.array(self.env.ground_truth_end_effector)[0])**2 + (np.array(self.env.ground_truth_valid_target)[1]-np.array(self.env.ground_truth_end_effector)[1])**2 + (np.array(self.env.ground_truth_valid_target)[2]-np.array(self.env.ground_truth_end_effector)[2])**2))
                 detectedJointAngles = np.zeros(4)
                 detectedJointVels = np.zeros(4)
                 ee_target = [0, 0, 0]
@@ -385,25 +388,25 @@ class MainReacher():
                 ee_target = self.get_target_coords(arrxy, arrxz)
 
             jointAngles = self.IK(detectedJointAngles, ee_target)
-            
+
             prev_jvs = detectedJointVels
-            prev_JAs = detectedJointAngles            
-            
+            prev_JAs = detectedJointAngles
+
             #anti-stuck system
             vel = (np.sum(detectedJointVels) + np.sum(prev_jvs))/2
-            if vel < 20:
+            if vel < 15:
                 randomMov += 1
             else:
                 randomMov = 0
             if randomMov > 500:
                 print('---')
-                print('Arm is stuck!')
+                print('Arm is stuck in local minimum!')
                 print('Initiating push')
                 print('---')
                 jointAngles = [0,0,0,0]
-                detectedJointVels = [30,30,30,30]
+                detectedJointVels = [2,2,2,2]
             #---
-            
+
             self.env.step((jointAngles , detectedJointVels , np.zeros(3), np.zeros(3)))
             #self.env.step((np.zeros(3),np.zeros(3), [0.6, -0.9, 0.4, 0.1], np.zeros(3)))
             #self.env.step((detectedJointAngles, detectedJointVels, [-1.3, 1.5, -2.2, 0.8], np.zeros(3)))
@@ -417,7 +420,10 @@ class MainReacher():
             veldiff2.append(np.abs(b))
             veldiff3.append(np.abs(c))
             veldiff4.append(np.abs(d))
-            
+
+            if reached ==1 or reached ==2:
+                reached += 1
+
             if self.env.targetTime >=1 - dt:
                 print("------------------------------")
                 print('TARGET REACHED!')
@@ -427,8 +433,13 @@ class MainReacher():
                 print('Average Velocity Error:', np.mean(veldiff1)+np.mean(veldiff2)+np.mean(veldiff3)+np.mean(veldiff4))
                 print("Distance at start: ", math.sqrt((np.array(self.env.ground_truth_valid_target)[0]-np.array(self.env.ground_truth_end_effector)[0])**2 + (np.array(self.env.ground_truth_valid_target)[1]-np.array(self.env.ground_truth_end_effector)[1])**2 + (np.array(self.env.ground_truth_valid_target)[2]-np.array(self.env.ground_truth_end_effector)[2])**2))
                 startingTime = time.time()
+                reached += 1
+            if reached == 3:
+                reached = 0
+                print("------------------------------")
+                print("Distance at start: ", math.sqrt((np.array(self.env.ground_truth_valid_target)[0]-np.array(self.env.ground_truth_end_effector)[0])**2 + (np.array(self.env.ground_truth_valid_target)[1]-np.array(self.env.ground_truth_end_effector)[1])**2 + (np.array(self.env.ground_truth_valid_target)[2]-np.array(self.env.ground_truth_end_effector)[2])**2))
             self.prev_target = ee_target
-            
+
 def main():
     reach = MainReacher()
     reach.go()
