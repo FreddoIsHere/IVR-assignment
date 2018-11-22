@@ -7,7 +7,7 @@ __________________________________________________________
 Files submitted:
 IK.py (Part B)
 main.py (Part C)
-Torque_ex.py (Part D)
+Torque_ex.py, Reacher.py (Part D)
 __________________________________________________________
 
 Reporting-Format:
@@ -26,7 +26,7 @@ Comments on features that potentially require explanation:
 PUSH-OUT-SYSTEM (IK, main):
 IK.py (Inverse Kinematics file) and main.py (Torque-control) both contain pieces of code that will initiate a force/movement to push the end-effector out of its stuck position in case of it stopping on a local minimum that is not the desired position. No movement causes a timer to start that induces the force/movement after 40s(main)/ 25s(IK). Since the objective is to simply reach the target this techinque fits the purpose.
 ---------------------
-POSITION-ESTIMATION-SYSTEM(IK, main, ObAvoidance):
+POSITION-ESTIMATION-SYSTEM(IK, main, Torque_ex):
 In case of the system being unable to detect the target (complete darkness) the system will take the previous target as its current target.
 In the case of our vision system being unable to detect a certain joint its position will be estimated by its previous velocity. This can cause the arm to spin violently in complete darkness. Since the objective is to simply reach the target this techinque fits the purpose.
 ---------------------
